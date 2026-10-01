@@ -12,8 +12,8 @@
       "bundleIdentifier": "com.kendrickhome.atlas",
       "buildNumber": "1",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Atlas uses the microphone only while you are speaking to the assistant.",
-        "NSSpeechRecognitionUsageDescription": "Atlas converts your speech into text so your private assistant can respond.",
+        "NSMicrophoneUsageDescription": "Allow Atlas to listen while you speak.",
+        "NSSpeechRecognitionUsageDescription": "Allow Atlas to convert your voice to text.",
         "NSFaceIDUsageDescription": "Atlas uses Face ID to confirm sensitive actions before carrying them out.",
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -46,7 +46,12 @@
       "privacy": {
         "audioRetention": "none",
         "providerKeysInApp": false
+      },
+      "router": {},
+      "eas": {
+        "projectId": "71e4615e-b60d-484c-9893-84d18a28eb47"
       }
-    }
+    },
+    "owner": "majormh"
   }
 }
