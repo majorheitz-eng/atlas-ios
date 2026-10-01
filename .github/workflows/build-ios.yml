@@ -6,10 +6,15 @@ on:
 jobs:
   build:
     name: Build iOS IPA
-    runs-on: macos-15
+    runs-on: macos-14
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Select Xcode 16.0
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+          xcodebuild -version
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -20,12 +25,35 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Install EAS CLI
-        run: npm install -g eas-cli
+      - name: Prebuild iOS native project
+        run: npx expo prebuild --platform ios --clean
 
-      - name: Build iOS IPA via EAS Local
+      - name: Install CocoaPods
         run: |
-          npx eas-cli build --platform ios --local --non-interactive --output=./artifacts/Atlas.ipa
+          cd ios
+          pod install
+
+      - name: Build Archive
+        run: |
+          cd ios
+          xcodebuild archive \
+            -workspace Atlas.xcworkspace \
+            -scheme Atlas \
+            -configuration Release \
+            -archivePath build/Atlas.xcarchive \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Generate IPA
+        run: |
+          cd ios
+          mkdir -p Payload
+          cp -r build/Atlas.xcarchive/Products/Applications/Atlas.app Payload/
+          zip -qr Atlas.ipa Payload
+          mkdir -p ../artifacts
+          mv Atlas.ipa ../artifacts/
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
