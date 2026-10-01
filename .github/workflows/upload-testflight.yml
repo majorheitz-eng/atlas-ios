@@ -1,0 +1,35 @@
+name: Upload IPA directly to TestFlight
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upload:
+    name: Upload to App Store Connect / TestFlight
+    runs-on: macos-14
+    steps:
+      - name: Setup App Store Connect Private Key
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.ASC_KEY_P8 }}" > ~/.appstoreconnect/private_keys/AuthKey_4YS72UMN75.p8
+
+      - name: Download compiled production IPA
+        run: |
+          curl -sL -H "Authorization: Bearer ${{ secrets.EXPO_TOKEN }}" "https://expo.dev/artifacts/eas/APy3i9MfNWaCxmFqMMLaKJ6s3LiqZzJX1hRys1vKMjM.ipa" -o Atlas.ipa
+          ls -lh Atlas.ipa
+
+      - name: Validate & Upload to TestFlight with xcrun altool
+        run: |
+          xcrun altool --validate-app \
+            -f Atlas.ipa \
+            -t ios \
+            --apiKey 4YS72UMN75 \
+            --apiIssuer 98cc8215-df4b-4071-993d-2f83eb0e502d \
+            --show-progress
+
+          xcrun altool --upload-app \
+            -f Atlas.ipa \
+            -t ios \
+            --apiKey 4YS72UMN75 \
+            --apiIssuer 98cc8215-df4b-4071-993d-2f83eb0e502d \
+            --show-progress
