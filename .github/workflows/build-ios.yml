@@ -23,25 +23,30 @@ jobs:
       - name: Prebuild iOS native project
         run: npx expo prebuild --platform ios --clean
 
-      - name: Downgrade Swift Package Manager tools version if needed
+      - name: Fix ExpoModulesJSI Swift package version
         run: |
-          # Patch Podfile to disable strict swift-tools check or use compatible settings
+          # Patch Package.swift inside node_modules/@expo/cli or expo-modules-core if present
+          find node_modules -name "Package.swift" -exec sed -i '' 's/swift-tools-version: 6.2/swift-tools-version: 6.0/g' {} + || true
+
+      - name: Install CocoaPods
+        run: |
           cd ios
           pod install
 
       - name: Build Archive
         run: |
           cd ios
+          # Allow package resolution to proceed without strict version failures
           xcodebuild archive \
             -workspace Atlas.xcworkspace \
             -scheme Atlas \
             -configuration Release \
             -archivePath build/Atlas.xcarchive \
             -destination 'generic/platform=iOS' \
+            -clonedSourcePackagesDirPath ./SourcePackages \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            SWIFT_VERSION=5.0
+            CODE_SIGN_IDENTITY=""
 
       - name: Generate IPA
         run: |
