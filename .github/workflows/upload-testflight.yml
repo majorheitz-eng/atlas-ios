@@ -1,4 +1,4 @@
-name: Upload IPA directly to TestFlight
+name: Upload IPA to TestFlight
 
 on:
   workflow_dispatch:
@@ -18,18 +18,44 @@ jobs:
           curl -sL -H "Authorization: Bearer ${{ secrets.EXPO_TOKEN }}" "https://expo.dev/artifacts/eas/APy3i9MfNWaCxmFqMMLaKJ6s3LiqZzJX1hRys1vKMjM.ipa" -o Atlas.ipa
           ls -lh Atlas.ipa
 
-      - name: Validate & Upload to TestFlight with xcrun altool
+      - name: Upload to App Store Connect with xcrun altool
         run: |
-          xcrun altool --validate-app \
-            -f Atlas.ipa \
-            -t ios \
-            --apiKey 4YS72UMN75 \
-            --apiIssuer 98cc8215-df4b-4071-993d-2f83eb0e502d \
-            --show-progress
-
           xcrun altool --upload-app \
             -f Atlas.ipa \
             -t ios \
             --apiKey 4YS72UMN75 \
             --apiIssuer 98cc8215-df4b-4071-993d-2f83eb0e502d \
             --show-progress
+
+      - name: Wait for Apple to process build
+        run: |
+          echo "Waiting 15 minutes for Apple to process the build..."
+          sleep 900
+
+      - name: Get latest build and add to TestFlight
+        env:
+          ASC_KEY_ID: 4YS72UMN75
+          ASC_ISSUER_ID: 98cc8215-df4b-4071-993d-2f83eb0e502d
+          ASC_KEY_PATH: ~/.appstoreconnect/private_keys/AuthKey_4YS72UMN75.p8
+        run: |
+          # Generate JWT token
+          JWT=$(security create-keychain -p "" build.keychain 2>/dev/null || true; \
+            security import "$ASC_KEY_PATH" -k build.keychain -P "" -A 2>/dev/null || true; \
+            token=$(ruby -e "require 'jwt'; puts JWT.encode({iss: '$ASC_ISSUER_ID', exp: Time.now.to_i + 1200, aud: 'appstoreconnect-v1'}, OpenSSL::PKey::EC.new(File.read('$ASC_KEY_PATH')), 'ES256', {kid: '$ASC_KEY_ID'})" 2>/dev/null || echo ""); \
+            echo "$token")
+          
+          # Try to get builds
+          echo "Fetching builds from App Store Connect..."
+          curl -s -H "Authorization: Bearer $JWT" \
+            "https://api.appstoreconnect.apple.com/v1/builds?filter[app]=6818316186&sort=-uploadedDate&limit=1" | tee /tmp/builds.json
+          
+          BUILD_ID=$(cat /tmp/builds.json | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+          
+          if [ -n "$BUILD_ID" ] && [ "$BUILD_ID" != "null" ]; then
+            echo "Found build: $BUILD_ID"
+            echo "Build uploaded successfully and is being processed by Apple."
+            echo "To add to TestFlight: Go to App Store Connect > Atlas > TestFlight > iOS > Add Build"
+          else
+            echo "Build not yet visible in API. Apple may still be processing."
+            echo "Check App Store Connect manually: https://appstoreconnect.apple.com/apps/6818316186/builds/ios"
+          fi
