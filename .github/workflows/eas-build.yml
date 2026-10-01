@@ -36,4 +36,4 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          npx eas-cli build --platform ios --profile ${{ github.event.inputs.profile || 'production' }} --non-interactive --no-wait
+          npx eas-cli build --platform ios --profile ${{ github.event.inputs.profile || 'production' }} --auto-submit --non-interactive --no-wait
