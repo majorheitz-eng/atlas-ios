@@ -11,7 +11,7 @@
     },
     "preview": {
       "distribution": "internal",
-      "ios": { "simulator": false }
+      "ios": { "simulator": true }
     },
     "production": {
       "autoIncrement": true
