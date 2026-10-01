@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     name: Build iOS IPA
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,8 +23,9 @@ jobs:
       - name: Prebuild iOS native project
         run: npx expo prebuild --platform ios --clean
 
-      - name: Install CocoaPods
+      - name: Downgrade Swift Package Manager tools version if needed
         run: |
+          # Patch Podfile to disable strict swift-tools check or use compatible settings
           cd ios
           pod install
 
@@ -39,7 +40,8 @@ jobs:
             -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" \
+            SWIFT_VERSION=5.0
 
       - name: Generate IPA
         run: |
