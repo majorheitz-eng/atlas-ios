@@ -18,6 +18,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "majorheitz@gmail.com",
+        "ascAppId": "6818316186",
+        "appleTeamId": "U7UKMADP3R"
+      }
+    }
   }
 }
