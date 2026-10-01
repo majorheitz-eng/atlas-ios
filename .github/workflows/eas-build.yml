@@ -1,7 +1,16 @@
-name: Build iOS with EAS
+name: Trigger EAS Build
 
 on:
   workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Build profile'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - preview
 
 jobs:
   build:
@@ -23,8 +32,8 @@ jobs:
       - name: Install EAS CLI
         run: npm install -g eas-cli
 
-      - name: Trigger EAS Cloud Simulator / Preview Build
+      - name: Run EAS Build
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          npx eas-cli build --platform ios --profile preview --non-interactive --no-wait || true
+          npx eas-cli build --platform ios --profile ${{ github.event.inputs.profile || 'production' }} --non-interactive --no-wait
