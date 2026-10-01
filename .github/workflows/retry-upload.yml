@@ -1,0 +1,19 @@
+name: Retry TestFlight Upload
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upload:
+    name: Upload to TestFlight
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Upload to TestFlight
+        run: |
+          echo "*** Upload ***"
+          gh run view $GITHUB_ACTION -L 1000 --repo $GITHUB_REPOSITORY
+          gh workflow run upload-testflight.yml --repo $GITHUB_REPOSITORY
