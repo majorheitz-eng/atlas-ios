@@ -60,7 +60,10 @@ export class HermesGatewayClient {
     url.searchParams.set('token', this.config.token);
     this.socket = new WebSocket(url.toString());
     this.socket.onmessage = (event) => this.handleMessage(String(event.data));
-    this.socket.onerror = () => this.failConnection(new Error('Could not reach the Atlas bridge'));
+    this.socket.onerror = (event) => {
+      const native = (() => { try { return (event as unknown as { error?: { message?: string } }).error?.message ?? 'no native error'; } catch { return 'unknown'; } })();
+      this.failConnection(new Error(`Could not reach the Atlas bridge | dialed: ${url.toString()} | native: ${native}`));
+    };
     this.socket.onclose = () => this.failConnection(new Error('Atlas bridge disconnected'));
 
     const timeout = setTimeout(
