@@ -17,7 +17,8 @@ export function normalizeBridgeUrl(input: string): string {
   }
 
   const loopback = LOOPBACK_HOSTS.has(url.hostname);
-  if (!loopback && ['http:', 'ws:'].includes(url.protocol)) {
+  const privateLan = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(url.hostname);
+  if (!loopback && !privateLan && ['http:', 'ws:'].includes(url.protocol)) {
     throw new Error('HTTPS is required for a remote Atlas bridge');
   }
 

@@ -103,6 +103,7 @@ export class HermesGatewayClient {
     });
   }
 
+
   disconnect(): void {
     this.socket?.close();
     this.socket = null;
