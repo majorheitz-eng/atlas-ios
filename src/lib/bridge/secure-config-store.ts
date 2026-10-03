@@ -8,6 +8,10 @@ export type BridgeConfig = {
 
 const URL_KEY = 'atlas.bridge.url';
 const TOKEN_KEY = 'atlas.bridge.token';
+
+// Built-in default connection — Atlas connects out of the box with no setup.
+const DEFAULT_BASE_URL = 'https://atlas-hermes.majorpropertymanagement.com';
+const DEFAULT_TOKEN = 'atlas-iphone-2026';
 const secureOptions: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
@@ -24,7 +28,7 @@ export async function loadBridgeConfig(): Promise<BridgeConfig | null> {
         SecureStore.getItemAsync(URL_KEY, secureOptions),
         SecureStore.getItemAsync(TOKEN_KEY, secureOptions),
       ]);
-  return baseUrl && token ? { baseUrl, token } : null;
+  return baseUrl && token ? { baseUrl, token } : { baseUrl: DEFAULT_BASE_URL, token: DEFAULT_TOKEN };
 }
 
 export async function saveBridgeConfig(config: BridgeConfig): Promise<void> {
