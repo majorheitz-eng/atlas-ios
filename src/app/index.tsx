@@ -33,7 +33,8 @@ import {
   type ApprovalRequest,
   type ConnectionState,
 } from '@/lib/bridge/hermes-gateway-client';
-import { loadBridgeConfig, type BridgeConfig } from '@/lib/bridge/secure-config-store';
+import { resolveGateway } from '@/lib/bridge/gateway-resolver';
+import type { BridgeConfig } from '@/lib/bridge/secure-config-store';
 import { palette } from '@/theme/palette';
 
 const nowId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -42,6 +43,8 @@ export default function AtlasHomeScreen() {
   const [state, dispatch] = useReducer(conversationReducer, initialConversationState);
   const [config, setConfig] = useState<BridgeConfig | null>(null);
   const [connection, setConnection] = useState<ConnectionState>('disconnected');
+  /** The URL that actually answered the WebSocket handshake — shown on the banner. */
+  const [connectedUrl, setConnectedUrl] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [streamingReply, setStreamingReply] = useState('');
   const { listen } = useLocalSearchParams<{ listen?: string }>();
@@ -53,12 +56,22 @@ export default function AtlasHomeScreen() {
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      void loadBridgeConfig().then((loaded) => {
-        if (!active) return;
-        setConfig(loaded);
-        clientRef.current?.disconnect();
-        clientRef.current = loaded ? new HermesGatewayClient(loaded, setConnection) : null;
-      });
+      // Bulletproof ordering: saved Keychain config → portable defaults
+      // (ngrok, localhost.run, LAN) → last resort. The URL that actually
+      // completed the handshake is shown on the banner.
+      void resolveGateway()
+        .then((resolution) => {
+          if (!active) return;
+          setConfig(resolution.config);
+          setConnectedUrl(resolution.source === 'fallback' ? null : resolution.connectedUrl);
+          clientRef.current?.disconnect();
+          clientRef.current = new HermesGatewayClient(resolution.config, setConnection);
+        })
+        .catch(() => {
+          if (!active) return;
+          setConfig(null);
+          setConnectedUrl(null);
+        });
       return () => {
         active = false;
       };
@@ -219,6 +232,14 @@ export default function AtlasHomeScreen() {
   const mode = state.phase;
   const statusColor = connection === 'connected' ? palette.success : config ? '#FFCA75' : palette.muted;
   const statusText = connection === 'connected' ? 'SECURE LINK' : config ? 'LINK STANDBY' : 'SETUP REQUIRED';
+  const bannerHost = useMemo(() => {
+    if (!connectedUrl) return '';
+    try {
+      return new URL(connectedUrl).hostname;
+    } catch {
+      return connectedUrl;
+    }
+  }, [connectedUrl]);
 
   return (
     <LinearGradient colors={['#071923', palette.canvas, '#020609']} locations={[0, 0.53, 1]} style={styles.fill}>
@@ -229,6 +250,9 @@ export default function AtlasHomeScreen() {
             <Text style={styles.eyebrow}>PERSONAL INTELLIGENCE</Text>
             <Text style={styles.wordmark}>ATLAS</Text>
           </View>
+          <Pressable onPress={() => router.push('/reading')} style={styles.settingsButton} accessibilityLabel="Atlas reading HUD">
+            <Text style={styles.readingGlyph}>☰</Text>
+          </Pressable>
           <Pressable onPress={() => router.push('/settings')} style={styles.settingsButton} accessibilityLabel="Atlas connection settings">
             <Text style={styles.settingsGlyph}>⌁</Text>
           </Pressable>
@@ -240,6 +264,24 @@ export default function AtlasHomeScreen() {
           <View style={styles.linkLine} />
           <Text style={styles.privateText}>PRIVATE CHANNEL</Text>
         </View>
+
+        {/* Connection banner: which URL actually connected. */}
+        {connectedUrl && (
+          <Pressable onPress={() => router.push('/settings')} style={styles.banner}>
+            <Text style={styles.bannerLabel}>LINKED VIA</Text>
+            <Text style={styles.bannerUrl} numberOfLines={1}>
+              {bannerHost}
+            </Text>
+          </Pressable>
+        )}
+        {!connectedUrl && connection === 'connecting' && (
+          <Pressable onPress={() => router.push('/settings')} style={styles.banner}>
+            <Text style={styles.bannerLabel}>FINDING ATLAS…</Text>
+            <Text style={styles.bannerUrl} numberOfLines={1}>
+              trying saved gateway, portable tunnel, home LAN
+            </Text>
+          </Pressable>
+        )}
 
         <ScrollView ref={scrollRef} style={styles.chat} contentContainerStyle={styles.chatContent} keyboardShouldPersistTaps="handled">
           {state.messages.length === 0 && !liveMessage ? (
@@ -295,7 +337,23 @@ const styles = StyleSheet.create({
   wordmark: { color: palette.text, fontSize: 30, lineHeight: 34, fontWeight: '200', letterSpacing: 7 },
   settingsButton: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: palette.line, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5,25,34,0.8)' },
   settingsGlyph: { color: palette.cyan, fontSize: 25, transform: [{ rotate: '45deg' }] },
+  readingGlyph: { color: palette.cyan, fontSize: 22, fontWeight: '400', marginTop: -2 },
   linkRow: { marginTop: 15, marginHorizontal: 22, flexDirection: 'row', alignItems: 'center' },
+  banner: {
+    marginTop: 8,
+    marginHorizontal: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(8,33,43,0.58)',
+    borderColor: palette.line,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  bannerLabel: { color: palette.cyan, fontSize: 8, letterSpacing: 1.4, fontWeight: '900' },
+  bannerUrl: { color: '#8FB3BE', fontSize: 10, flex: 1 },
   statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 7 },
   linkText: { fontSize: 8, letterSpacing: 1.4, fontWeight: '900' },
   linkLine: { height: 1, flex: 1, backgroundColor: palette.line, marginHorizontal: 10 },

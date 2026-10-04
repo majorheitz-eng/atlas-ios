@@ -6,6 +6,13 @@ export type BridgeConfig = {
   token: string;
 };
 
+/** A load result that says where the config came from. */
+export type LoadedBridgeConfig = {
+  config: BridgeConfig;
+  /** 'saved' = user-saved Keychain entry; 'default' = baked-in portable default. */
+  source: 'saved' | 'default';
+};
+
 const URL_KEY = 'atlas.bridge.url';
 const TOKEN_KEY = 'atlas.bridge.token';
 
@@ -35,6 +42,23 @@ export async function loadBridgeConfig(): Promise<BridgeConfig | null> {
     return { baseUrl: DEFAULT_BASE_URL, token: DEFAULT_TOKEN };
   }
   return { baseUrl, token };
+}
+
+// Variant that reports whether the values are user-saved or baked-in defaults.
+// The gateway resolver uses this to honor the fallback order: saved config
+// first, then the portable defaults list, then a fresh user entry.
+export async function loadBridgeConfigWithSource(): Promise<LoadedBridgeConfig> {
+  const storage = webStorage();
+  const [baseUrl, token] = storage
+    ? [storage.getItem(URL_KEY), storage.getItem(TOKEN_KEY)]
+    : await Promise.all([
+        SecureStore.getItemAsync(URL_KEY, secureOptions),
+        SecureStore.getItemAsync(TOKEN_KEY, secureOptions),
+      ]);
+  if (baseUrl && token && !DEPRECATED_HOSTS.some((h) => baseUrl.includes(h))) {
+    return { config: { baseUrl, token }, source: 'saved' };
+  }
+  return { config: { baseUrl: DEFAULT_BASE_URL, token: DEFAULT_TOKEN }, source: 'default' };
 }
 
 export async function saveBridgeConfig(config: BridgeConfig): Promise<void> {

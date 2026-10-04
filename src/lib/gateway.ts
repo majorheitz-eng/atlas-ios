@@ -1,20 +1,34 @@
-// Atlas Gateway Configuration
-// Generated: 2026-10-02
+// ============================================================================
+// ATLAS GATEWAY CONFIG — the single file you edit to change where Atlas calls
+// home. This one config drives iPhone, RayNeo iO glasses (Android) and any
+// future ESP32 puck that speaks the same gateway protocol.
+//
+// Fallback order used by the app at connect time:
+//   1. Saved gateway URL + token from device Keychain (set in Settings)
+//   2. fallbackUrls below, tried top to bottom — first one that answers wins
+//   3. Any URL the user types in Settings (Test & Save promotes it to tier 1)
+//
+// The winning URL is shown on the main screen banner so you always know which
+// transport actually connected.
+// ============================================================================
 
-export const GATEWAY_CONFIG = {
-  // Your Hermes backend is exposed via Cloudflare Tunnel
-  url: "https://lyrics-mechanisms-careers-parliamentary.trycloudflare.com",
-  
-  // Temporary token - replace with actual token from Hermes
-  // Run: hermes gateway token create --name "Atlas iPhone"
-  token: "temp_atlas_token",
-  
-  // Connection settings
-  wsUrl: "wss://lyrics-mechanisms-careers-parliamentary.trycloudflare.com/api/ws",
-  
-  // Auto-reconnect settings
-  reconnectInterval: 3000,
-  maxReconnectAttempts: 5,
-};
+export const ATLAS_GATEWAY_CONFIG = {
+  // Same token everywhere (iPhone app, glasses, puck).
+  token: 'atlas-iphone-2026',
 
-export default GATEWAY_CONFIG;
+  // Tried top to bottom when nothing is saved in the Keychain.
+  fallbackUrls: [
+    // Permanent portable tunnel (ngrok static domain) — works on any network.
+    'https://petroleum-multiply-backtalk.ngrok-free.dev',
+    // localhost.run free tunnel — free but flaky, kept as secondary.
+    'https://86b0cc90b95d10.lhr.life',
+    // Home LAN relay (atlas-voice-puck/lan_relay.js on the desktop, 0.0.0.0:9121)
+    // — fastest path when phone/glasses are on the home WiFi.
+    'http://192.168.4.22:9121',
+  ],
+
+  // Per-candidate connect timeout for the fallback walk (ms).
+  connectTimeoutMs: 8000,
+} as const;
+
+export default ATLAS_GATEWAY_CONFIG;
