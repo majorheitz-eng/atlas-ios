@@ -33,6 +33,7 @@ import {
   type ApprovalRequest,
   type ConnectionState,
 } from '@/lib/bridge/hermes-gateway-client';
+import { HermesLongPollClient } from '@/lib/bridge/hermes-lp-client';
 import { resolveGateway } from '@/lib/bridge/gateway-resolver';
 import { speakReply } from '@/lib/voice/playback';
 import type { BridgeConfig } from '@/lib/bridge/secure-config-store';
@@ -66,7 +67,11 @@ export default function AtlasHomeScreen() {
           setConfig(resolution.config);
           setConnectedUrl(resolution.source === 'fallback' ? null : resolution.connectedUrl);
           clientRef.current?.disconnect();
-          clientRef.current = new HermesGatewayClient(resolution.config, setConnection);
+          clientRef.current = resolution.transport === 'lp'
+            ? (new HermesLongPollClient(resolution.config, setConnection) as unknown as HermesGatewayClient)
+            : new HermesGatewayClient(resolution.config, setConnection);
+          // Proactively connect so the banner goes green without a voice prompt.
+          void clientRef.current.connect().catch(() => {});
         })
         .catch(() => {
           if (!active) return;
