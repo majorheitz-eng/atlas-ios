@@ -31,4 +31,14 @@ export const ATLAS_GATEWAY_CONFIG = {
   connectTimeoutMs: 8000,
 } as const;
 
+
+export const ATLAS_VOICE = {
+  // ElevenLabs "Major Atlas" voice clone — embedded so every device speaks
+  // with the same voice with zero setup. Override via Settings → Voice if
+  // you ever want a different voice on a specific device.
+  apiKey: 'sk_27bf6fed6ae796a0c3ca2be6f499aa61038f14bf6c303a13',
+  voiceId: '059VWGgvQfSfNZNaRx16',
+  modelId: 'eleven_turbo_v2_5',
+} as const;
+
 export default ATLAS_GATEWAY_CONFIG;

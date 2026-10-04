@@ -2,6 +2,7 @@
 import * as Speech from 'expo-speech';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { loadVoiceConfig } from './voice-config-store';
+import { ATLAS_VOICE } from '../gateway';
 import { synthesizeToFile } from './elevenlabs';
 
 let configured = false;
@@ -16,7 +17,8 @@ async function ensureAudioMode() {
 let currentPlayer: AudioPlayer | null = null;
 
 export async function speakReply(text: string, onDone: () => void): Promise<void> {
-  const cfg = await loadVoiceConfig();
+  const stored = await loadVoiceConfig();
+  const cfg = stored ?? { apiKey: ATLAS_VOICE.apiKey, voiceId: ATLAS_VOICE.voiceId };
   if (cfg?.apiKey && cfg?.voiceId) {
     try {
       await ensureAudioMode();
