@@ -7,11 +7,31 @@ import { HermesGatewayClient } from '@/lib/bridge/hermes-gateway-client';
 import { loadBridgeConfig, saveBridgeConfig } from '@/lib/bridge/secure-config-store';
 import { normalizeBridgeUrl } from '@/lib/bridge/normalize-bridge-url';
 import { palette } from '@/theme/palette';
+import { loadVoiceConfig, saveVoiceConfig } from '@/lib/voice/voice-config-store';
 
 export default function SettingsScreen() {
   const [baseUrl, setBaseUrl] = useState('');
   const [token, setToken] = useState('');
   const [testing, setTesting] = useState(false);
+  const [voiceKey, setVoiceKey] = useState('');
+  const [voiceId, setVoiceId] = useState('');
+
+  useEffect(() => {
+    loadVoiceConfig().then((v) => {
+      if (v) { setVoiceKey(v.apiKey); setVoiceId(v.voiceId); }
+    });
+  }, []);
+
+  const saveVoice = async () => {
+    try {
+      if (!voiceKey.trim() || !voiceId.trim()) throw new Error('Enter both the ElevenLabs API key and the voice ID.');
+      await saveVoiceConfig({ apiKey: voiceKey, voiceId: voiceId });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Voice saved', 'Atlas will speak with your ElevenLabs voice.');
+    } catch (error) {
+      Alert.alert('Voice not saved', error instanceof Error ? error.message : 'Check the key and voice ID.');
+    }
+  };
 
   useEffect(() => {
     loadBridgeConfig().then((config) => {
@@ -88,6 +108,31 @@ export default function SettingsScreen() {
           </Pressable>
           <Pressable disabled={testing} onPress={() => save(false)} style={styles.secondary}>
             <Text style={styles.secondaryText}>SAVE WITHOUT TESTING</Text>
+          </Pressable>
+
+          <Text style={styles.label}>ELEVENLABS API KEY (VOICE)</Text>
+          <TextInput
+            value={voiceKey}
+            onChangeText={setVoiceKey}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            placeholder="sk_..."
+            placeholderTextColor="#49636D"
+            style={styles.input}
+          />
+          <Text style={styles.label}>VOICE ID (MAJOR ATLAS CLONE)</Text>
+          <TextInput
+            value={voiceId}
+            onChangeText={setVoiceId}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="e.g. CwhRBWXzGAHq8TQ4Fs17"
+            placeholderTextColor="#49636D"
+            style={styles.input}
+          />
+          <Pressable onPress={saveVoice} style={styles.secondary}>
+            <Text style={styles.secondaryText}>SAVE VOICE</Text>
           </Pressable>
 
           <View style={styles.note}>

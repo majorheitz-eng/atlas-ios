@@ -34,6 +34,7 @@ import {
   type ConnectionState,
 } from '@/lib/bridge/hermes-gateway-client';
 import { resolveGateway } from '@/lib/bridge/gateway-resolver';
+import { speakReply } from '@/lib/voice/playback';
 import type { BridgeConfig } from '@/lib/bridge/secure-config-store';
 import { palette } from '@/theme/palette';
 
@@ -167,14 +168,7 @@ export default function AtlasHomeScreen() {
         text: reply,
         createdAt: new Date().toISOString(),
       });
-      Speech.speak(reply, {
-        language: 'en-US',
-        rate: 0.96,
-        pitch: 0.93,
-        onDone: () => dispatch({ type: 'SPEECH_FINISHED' }),
-        onStopped: () => dispatch({ type: 'SPEECH_FINISHED' }),
-        onError: () => dispatch({ type: 'SPEECH_FINISHED' }),
-      });
+      await speakReply(reply, () => dispatch({ type: 'SPEECH_FINISHED' }));
     } catch (error) {
       setStreamingReply('');
       dispatch({
