@@ -10,7 +10,8 @@ const URL_KEY = 'atlas.bridge.url';
 const TOKEN_KEY = 'atlas.bridge.token';
 
 // Built-in default connection — Atlas connects out of the box with no setup.
-const DEFAULT_BASE_URL = 'https://atlas-hermes.majorpropertymanagement.com';
+const DEFAULT_BASE_URL = 'https://petroleum-multiply-backtalk.ngrok-free.dev';
+const DEPRECATED_HOSTS = ['atlas-hermes.majorpropertymanagement.com', 'trycloudflare.com', 'tunnelmole.net'];
 const DEFAULT_TOKEN = 'atlas-iphone-2026';
 const secureOptions: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
@@ -28,7 +29,12 @@ export async function loadBridgeConfig(): Promise<BridgeConfig | null> {
         SecureStore.getItemAsync(URL_KEY, secureOptions),
         SecureStore.getItemAsync(TOKEN_KEY, secureOptions),
       ]);
-  return baseUrl && token ? { baseUrl, token } : { baseUrl: DEFAULT_BASE_URL, token: DEFAULT_TOKEN };
+  if (!baseUrl || !token) return { baseUrl: DEFAULT_BASE_URL, token: DEFAULT_TOKEN };
+  // Auto-migrate away from dead transports (Cloudflare edge blocks phone WS upgrades).
+  if (DEPRECATED_HOSTS.some((h) => baseUrl.includes(h))) {
+    return { baseUrl: DEFAULT_BASE_URL, token: DEFAULT_TOKEN };
+  }
+  return { baseUrl, token };
 }
 
 export async function saveBridgeConfig(config: BridgeConfig): Promise<void> {
