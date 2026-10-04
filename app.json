@@ -58,6 +58,15 @@
         "projectId": "71e4615e-b60d-484c-9893-84d18a28eb47"
       }
     },
-    "owner": "majormh"
+    "owner": "majormh",
+    "android": {
+      "package": "com.kendrickhome.atlas",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true
+    }
   }
 }
