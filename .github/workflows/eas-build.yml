@@ -11,6 +11,15 @@ on:
         options:
           - production
           - preview
+      platform:
+        description: 'Platform'
+        required: true
+        default: 'ios'
+        type: choice
+        options:
+          - ios
+          - android
+          - all
 
 jobs:
   build:
@@ -36,4 +45,13 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          npx eas-cli build --platform ios --profile ${{ github.event.inputs.profile || 'production' }} --auto-submit --non-interactive --no-wait
+          PLATFORM="${{ github.event.inputs.platform || 'ios' }}"
+          PROFILE="${{ github.event.inputs.profile || 'production' }}"
+          if [ "$PLATFORM" = "all" ]; then
+            npx eas-cli build --platform ios --profile "$PROFILE" --auto-submit --non-interactive --no-wait
+            npx eas-cli build --platform android --profile "$PROFILE" --non-interactive --no-wait
+          elif [ "$PLATFORM" = "android" ]; then
+            npx eas-cli build --platform android --profile "$PROFILE" --non-interactive --no-wait
+          else
+            npx eas-cli build --platform ios --profile "$PROFILE" --auto-submit --non-interactive --no-wait
+          fi
