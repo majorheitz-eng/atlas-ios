@@ -127,7 +127,7 @@ final class GlassesSDKManager: NSObject {
       throw GlassesError.notAuthenticated
     }
     let truncated = text.utf8.count > 1024 ? String(text.prefix(1024)) : text
-    let payload = try AssistantTextPrototype.asrText(truncated)
+    let payload = try AssistantTextPrototype.asrText(truncated, isFinal: true)
     let message = try MessageFactory.make(
       payload: payload, deviceID: device.deviceID(),
       business: .voiceAssistant, messageID: UUID().uuidString)
