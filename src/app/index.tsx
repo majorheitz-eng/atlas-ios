@@ -183,10 +183,9 @@ export default function AtlasHomeScreen() {
   useSpeechRecognitionEvent('error', (event) => {
     if (event.error !== 'aborted' && event.error !== 'no-speech') {
       Alert.alert('Voice unavailable', event.message || 'Atlas could not access speech recognition.');
+      // Only block auto-listen on genuine errors, not transient no-speech/aborted
+      autoListenBlockedRef.current = true;
     }
-    // An error aborts the auto-listen loop — don't keep re-triggering a
-    // broken mic. The user can re-arm conversation mode explicitly.
-    autoListenBlockedRef.current = true;
     dispatch({ type: 'LISTENING_STOPPED' });
   });
 
@@ -369,7 +368,7 @@ export default function AtlasHomeScreen() {
     ExpoSpeechRecognitionModule.start({
       lang: 'en-US',
       interimResults: true,
-      continuous: false,
+      continuous: conversationModeRef.current,
       maxAlternatives: 1,
       requiresOnDeviceRecognition: false,
       contextualStrings: ['Atlas', 'Hermes', 'Kendrick Home'],

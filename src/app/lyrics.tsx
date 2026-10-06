@@ -201,7 +201,7 @@ export default function LyricsHudScreen() {
       if (idx !== prev && idx >= 0) {
         scrollRef.current?.scrollTo({
           y: lineTopsRef.current[idx] ?? 0,
-          animated: true,
+          animated: false,
         });
       }
       return idx;
@@ -216,7 +216,6 @@ export default function LyricsHudScreen() {
   }, [activeIndex, synced, rayneo]);
 
   const togglePlay = useCallback(() => {
-    if (synced.length === 0) return;
     if (playingRef.current) {
       playingRef.current = false;
       setPlaying(false);
