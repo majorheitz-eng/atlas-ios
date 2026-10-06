@@ -16,5 +16,9 @@ Pod::Spec.new do |s|
   s.source_files   = 'ios/src/**/*.{swift,h,m}'
   s.vendored_frameworks = 'ios/RayneoNet.framework'
   s.frameworks     = 'CoreBluetooth', 'ExternalAccessory'
+  s.pod_target_xcconfig = {
+    'OTHER_LDFLAGS' => '-framework RayneoNet',
+    'FRAMEWORK_SEARCH_PATHS' => '"$(inherited)" "$(PODS_ROOT)/rayneo-glasses/ios"'
+  }
   s.dependency     'ExpoModulesCore'
 end
