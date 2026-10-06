@@ -20,7 +20,7 @@ import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
-import { ArcReactor } from '@/components/arc-reactor';
+import { ArcReactor, type ReactorMode } from '@/components/arc-reactor';
 import { MessageBubble } from '@/components/message-bubble';
 import {
   conversationReducer,
@@ -454,7 +454,8 @@ export default function AtlasHomeScreen() {
     };
   }, [streamingReply]);
 
-  const mode = state.phase;
+  // Map conversation phase to reactor mood (speaking → responding)
+  const mode: ReactorMode = state.phase === 'speaking' ? 'responding' : state.phase;
   const statusColor = connection === 'connected' ? palette.success : config ? '#FFCA75' : palette.muted;
   const statusText = connection === 'connected' ? 'SECURE LINK' : config ? 'LINK STANDBY' : 'SETUP REQUIRED';
   const bannerHost = useMemo(() => {

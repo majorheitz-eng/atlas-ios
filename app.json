@@ -18,6 +18,10 @@
         "NSPhotoLibraryUsageDescription": "Atlas accesses your photo library to allow you to select and share images.",
         "NSCameraUsageDescription": "Atlas uses the camera to capture photos for sharing.",
         "NSLocationWhenInUseUsageDescription": "Atlas uses your location for the speedometer HUD on your glasses.",
+        "NSBluetoothAlwaysUsageDescription": "Atlas uses Bluetooth to connect to your RayNeo iO glasses and display responses on the HUD.",
+        "NSBluetoothPeripheralUsageDescription": "Atlas uses Bluetooth to connect to your RayNeo iO glasses.",
+        "UISupportedExternalAccessoryProtocols": ["com.rayneo.venus.pub"],
+        "UIBackgroundModes": ["bluetooth-central"],
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
@@ -26,7 +30,6 @@
       }
     },
     "plugins": [
-      "./modules/rayneo-glasses/expo.config.js",
       "expo-router",
       "expo-secure-store",
       "expo-local-authentication",

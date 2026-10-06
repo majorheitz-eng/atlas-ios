@@ -2,42 +2,88 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-export type ReactorMode = 'idle' | 'listening' | 'thinking' | 'speaking';
-
-// NO Animated API — all motion via useState + setInterval on JS thread.
-// EAS cloud builds have a working native driver, but we keep this approach
-// for consistency and to avoid any future local-build issues.
+export type ReactorMode =
+  | 'idle' | 'listening' | 'thinking' | 'responding'
+  | 'creative' | 'happy' | 'focused' | 'caution'
+  | 'empathetic' | 'analyzing' | 'neutral' | 'sleep';
 
 // Glass orb with internal particle waveform.
-// Inspired by the user's reference: a luminous sphere with a glowing wave
+// Matches the user's reference design: a luminous sphere with a glowing wave
 // inside, rim lighting, bloom, and mood colors that shift per state.
-// Each mode changes the color, wave amplitude, and animation speed to
-// give Atlas personality — calm, electric, deep, warm.
+// 12 mood states — each with its own color, intensity, and personality.
 
 const MOOD = {
   idle: {
-    wave: '#23E6FF', glow: '#1A8BCC', rim: '#23E6FF', hot: '#A0F0FF',
-    particle: '#5FEFFF', aura: '#23E6FF',
+    wave: '#DDDDDD', glow: '#888888', rim: '#DDDDDD', hot: '#FFFFFF',
+    particle: '#CCCCCC', aura: '#AAAAAA',
     label: 'TAP TO SPEAK',
-    speed: 0.015, amplitude: 0.10, breathRate: 0.008, particleCount: 80,
+    speed: 0.012, amplitude: 0.08, breathRate: 0.006, particleCount: 70,
   },
   listening: {
-    wave: '#23E6FF', glow: '#1A8BCC', rim: '#5FEFFF', hot: '#FFFFFF',
-    particle: '#C9FBFF', aura: '#23E6FF',
+    wave: '#0066FF', glow: '#0044CC', rim: '#3388FF', hot: '#AADDFF',
+    particle: '#3388FF', aura: '#0066FF',
     label: 'LISTENING',
     speed: 0.035, amplitude: 0.20, breathRate: 0.020, particleCount: 100,
   },
   thinking: {
-    wave: '#B47CFF', glow: '#7B3FFF', rim: '#D4A5FF', hot: '#F0E0FF',
-    particle: '#D4A5FF', aura: '#9966FF',
-    label: 'PROCESSING',
-    speed: 0.050, amplitude: 0.25, breathRate: 0.035, particleCount: 120,
+    wave: '#00CCFF', glow: '#0088CC', rim: '#33DDFF', hot: '#AAEEFF',
+    particle: '#33DDFF', aura: '#00CCFF',
+    label: 'THINKING',
+    speed: 0.045, amplitude: 0.22, breathRate: 0.030, particleCount: 110,
   },
-  speaking: {
-    wave: '#64F5BD', glow: '#2DBF88', rim: '#A0FFD8', hot: '#E0FFE8',
-    particle: '#A0FFD8', aura: '#4AE6A8',
-    label: 'ATLAS ONLINE',
+  responding: {
+    wave: '#00FF77', glow: '#00CC55', rim: '#33FFAA', hot: '#AAFFCC',
+    particle: '#33FFAA', aura: '#00FF77',
+    label: 'RESPONDING',
     speed: 0.030, amplitude: 0.18, breathRate: 0.015, particleCount: 90,
+  },
+  creative: {
+    wave: '#9933FF', glow: '#6600CC', rim: '#BB66FF', hot: '#DDAAFF',
+    particle: '#BB66FF', aura: '#9933FF',
+    label: 'CREATIVE',
+    speed: 0.040, amplitude: 0.25, breathRate: 0.025, particleCount: 120,
+  },
+  happy: {
+    wave: '#FFCC00', glow: '#CC9900', rim: '#FFDD33', hot: '#FFEEAA',
+    particle: '#FFDD33', aura: '#FFCC00',
+    label: 'HAPPY',
+    speed: 0.035, amplitude: 0.20, breathRate: 0.018, particleCount: 95,
+  },
+  focused: {
+    wave: '#FF8800', glow: '#CC6600', rim: '#FFAA33', hot: '#FFCCAA',
+    particle: '#FFAA33', aura: '#FF8800',
+    label: 'FOCUSED',
+    speed: 0.025, amplitude: 0.15, breathRate: 0.012, particleCount: 80,
+  },
+  caution: {
+    wave: '#FF3333', glow: '#CC0000', rim: '#FF6666', hot: '#FFAAAA',
+    particle: '#FF6666', aura: '#FF3333',
+    label: 'CAUTION',
+    speed: 0.050, amplitude: 0.28, breathRate: 0.040, particleCount: 100,
+  },
+  empathetic: {
+    wave: '#FF3399', glow: '#CC0066', rim: '#FF66BB', hot: '#FFAADD',
+    particle: '#FF66BB', aura: '#FF3399',
+    label: 'EMPATHETIC',
+    speed: 0.020, amplitude: 0.12, breathRate: 0.010, particleCount: 75,
+  },
+  analyzing: {
+    wave: '#00FFCC', glow: '#00CCAA', rim: '#33FFDD', hot: '#AAFFEE',
+    particle: '#33FFDD', aura: '#00FFCC',
+    label: 'ANALYZING',
+    speed: 0.040, amplitude: 0.22, breathRate: 0.028, particleCount: 105,
+  },
+  neutral: {
+    wave: '#DDDDDD', glow: '#999999', rim: '#EEEEEE', hot: '#FFFFFF',
+    particle: '#CCCCCC', aura: '#BBBBBB',
+    label: 'NEUTRAL',
+    speed: 0.015, amplitude: 0.10, breathRate: 0.008, particleCount: 75,
+  },
+  sleep: {
+    wave: '#333333', glow: '#222222', rim: '#444444', hot: '#555555',
+    particle: '#3A3A3A', aura: '#2A2A2A',
+    label: 'SLEEP MODE',
+    speed: 0.005, amplitude: 0.04, breathRate: 0.003, particleCount: 40,
   },
 } as const;
 
