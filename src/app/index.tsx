@@ -576,6 +576,17 @@ export default function AtlasHomeScreen() {
                 <Text style={styles.menuGlyph}>☰</Text>
                 <Text style={styles.menuLabel}>Reading</Text>
               </Pressable>
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuOpen(false);
+                  router.push('/messages');
+                }}
+                accessibilityLabel="Atlas messages — read texts on glasses"
+              >
+                <Text style={styles.menuGlyph}>✉</Text>
+                <Text style={styles.menuLabel}>Messages</Text>
+              </Pressable>
             </View>
           </Pressable>
         )}

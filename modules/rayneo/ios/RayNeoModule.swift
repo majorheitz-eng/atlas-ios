@@ -287,6 +287,56 @@ public class RayNeoModule: Module {
   // EASession transport (primary for MFi glasses)
   private var eaSession: EASession?
   private var eaInput: InputStream?
+
+  // Notification mirroring — captures iOS notifications and pushes to glasses
+  private var notificationMirrorEnabled = false
+  private var notificationObserver: NSObjectProtocol?
+
+  private func startNotificationMirror() {
+    guard !notificationMirrorEnabled else { return }
+    notificationMirrorEnabled = true
+
+    // Listen for iOS notifications — this captures the full notification body
+    // including SMS/iMessage content, email previews, etc.
+    notificationObserver = NotificationCenter.default.addObserver(
+      forName: NSNotification.Name("EXNotificationReceived"),
+      object: nil,
+      queue: .main
+    ) { [weak self] notification in
+      guard let self else { return }
+      let title = (notification.userInfo?["title"] as? String) ?? "Notification"
+      let body = (notification.userInfo?["body"] as? String) ?? ""
+      let app = (notification.userInfo?["appId"] as? String) ?? ""
+
+      // Push as a notification card to the glasses
+      if !body.isEmpty {
+        try? self.sendNotificationToGlasses(title: title, content: body, appName: app)
+      }
+    }
+  }
+
+  private func stopNotificationMirror() {
+    notificationMirrorEnabled = false
+    if let observer = notificationObserver {
+      NotificationCenter.default.removeObserver(observer)
+      notificationObserver = nil
+    }
+  }
+
+  private func sendNotificationToGlasses(title: String, content: String, appName: String?) throws {
+    let uid = String(Int.random(in: 1...2_147_483_646))
+    let ts = Self.currentISO8601()
+    let body: [String: Any] = [
+      "notificationUID": uid,
+      "appId": "com.kendrickhome.atlas",
+      "appName": appName ?? "Atlas",
+      "title": title, "subtitle": "",
+      "content": content, "timestamp": ts,
+      "category": 0, "reply": false, "type": 1,
+    ]
+    let payload = try AssistantEncoders.notification(type: 2, body: body)
+    try self.sendBusiness(21, payload: payload)
+  }
   private var eaOutput: OutputStream?
   private var eaAccessory: EAAccessory?
   private var eaConnected = false
@@ -416,6 +466,18 @@ public class RayNeoModule: Module {
       ]
       let settingsData = try AssistantEncoders.encodeSettingsJSON(settingsBody)
       try self.sendBusiness(15, payload: BusinessEnvelope.encode(type: 4, body: settingsData))
+    }
+
+    AsyncFunction("startNotificationMirror") { () -> Void in
+      self.startNotificationMirror()
+    }
+
+    AsyncFunction("stopNotificationMirror") { () -> Void in
+      self.stopNotificationMirror()
+    }
+
+    AsyncFunction("pushTextToGlasses") { (title: String, content: String) -> Void in
+      try self.sendNotificationToGlasses(title: title, content: content, appName: "Atlas")
     }
   }
 
