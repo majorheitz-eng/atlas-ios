@@ -368,7 +368,7 @@ export default function AtlasHomeScreen() {
     ExpoSpeechRecognitionModule.start({
       lang: 'en-US',
       interimResults: true,
-      continuous: conversationModeRef.current,
+      continuous: false,
       maxAlternatives: 1,
       requiresOnDeviceRecognition: false,
       contextualStrings: ['Atlas', 'Hermes', 'Kendrick Home'],
