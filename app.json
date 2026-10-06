@@ -47,7 +47,6 @@
         }
       ],
       "expo-audio",
-      "expo-dev-client",
       "expo-image-picker",
       "expo-document-picker",
       "expo-location"
