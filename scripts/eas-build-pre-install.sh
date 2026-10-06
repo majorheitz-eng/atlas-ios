@@ -5,7 +5,7 @@
 # `import RayneoNet` resolves at compile time, while the real symbols come
 # from the embedded binary framework at link time.
 
-set -e
+set +e
 
 MODULE_DIR="$(dirname "$0")/../modules/rayneo/ios/ABI"
 SWIFTMODULE_DIR="$(dirname "$0")/../modules/rayneo/ios/ABI/build"

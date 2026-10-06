@@ -96,6 +96,7 @@ type RayNeoNativeModule = {
   setBrightness(value: number): Promise<void>;
   setDisplay(height: number, distance: number): Promise<void>;
   refreshSettings(): Promise<void>;
+  getScanStatus(): Promise<string>;
 };
 
 const NativeRayNeo = requireNativeModule<RayNeoNativeModule>('RayNeo');
@@ -228,6 +229,11 @@ export function refreshSettings(): Promise<void> {
   return NativeRayNeo.refreshSettings();
 }
 
+/** Query the current scan status from the native module. */
+export function getScanStatus(): Promise<string> {
+  return NativeRayNeo.getScanStatus();
+}
+
 /**
  * Subscribe to RayNeo connection lifecycle / inbound events.
  *
@@ -297,4 +303,5 @@ export default {
   onMessageReceived,
   onSettings,
   onError,
+  getScanStatus,
 };
