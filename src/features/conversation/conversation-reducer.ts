@@ -24,7 +24,9 @@ export type ConversationAction =
   | { type: 'RESPONSE_RECEIVED'; replyId: string; requestId: string; text: string; createdAt: string }
   | { type: 'REQUEST_FAILED'; requestId: string; error: string }
   | { type: 'SPEECH_FINISHED' }
-  | { type: 'ERROR_CLEARED' };
+  | { type: 'ERROR_CLEARED' }
+  | { type: 'HISTORY_LOADED'; messages: ConversationMessage[] }
+  | { type: 'CLEAR_HISTORY' };
 
 export const initialConversationState: ConversationState = {
   phase: 'idle',
@@ -92,5 +94,9 @@ export function conversationReducer(
       return { ...state, phase: 'idle' };
     case 'ERROR_CLEARED':
       return { ...state, error: null };
+    case 'HISTORY_LOADED':
+      return { ...state, messages: action.messages };
+    case 'CLEAR_HISTORY':
+      return { ...state, messages: [], transcript: '', error: null, phase: 'idle' };
   }
 }

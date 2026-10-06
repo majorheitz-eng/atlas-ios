@@ -32,29 +32,6 @@ export const ATLAS_GATEWAY_CONFIG = {
 } as const;
 
 
-// ============================================================================
-// RAYNEO iO GLASSES — paired device info, baked in for zero-setup auto-connect.
-// The glasses are a closed BLE device using MFi (ExternalAccessory) + a
-// proprietary GATT profile.  They must already be bonded through the official
-// RayNeo app; this config lets the native BLE module connect directly without
-// re-pairing.
-// ============================================================================
-export const ATLAS_GLASSES = {
-  // From Device Info screen in the RayNeo app.
-  deviceName: 'RayNeo iO-A594',
-  strixOS: 'Strix OS 1.0.4.12',
-  model: 'RayNeo iO',
-  deviceNumber: 'ARGF30-2B4FEU11',
-  serialNumber: '006A5E5F15EA594',
-  macAddress: '00:6A:5E:5F:15:EA',
-  // GATT profile (from the open-source Turbo-IO transport layer).
-  serviceUUID: '0000B81D-0000-1000-8000-00805F9B34FB',
-  outboundUUID: 'EA8B70D5-2BD3-49AB-9C31-9C38B2C3C4F9', // phone → glasses (write)
-  inboundUUID: '7DB3E235-3608-41F3-A03C-955FCBD2EA4B', // glasses → phone (notify)
-  // MFi accessory protocol string for EASession.
-  accessoryProtocol: 'com.rayneo.venus.pub',
-} as const;
-
 export const ATLAS_VOICE = {
   // ElevenLabs "Major Atlas" voice clone — embedded so every device speaks
   // with the same voice with zero setup. Override via Settings → Voice if

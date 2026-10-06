@@ -16,6 +16,8 @@
         "NSSpeechRecognitionUsageDescription": "Allow Atlas to convert your voice to text.",
         "NSFaceIDUsageDescription": "Atlas uses Face ID to confirm sensitive actions before carrying them out.",
         "NSPhotoLibraryUsageDescription": "Atlas accesses your photo library to allow you to select and share images.",
+        "NSCameraUsageDescription": "Atlas uses the camera to capture photos for sharing.",
+        "NSLocationWhenInUseUsageDescription": "Atlas uses your location for the speedometer HUD on your glasses.",
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
@@ -45,7 +47,10 @@
         }
       ],
       "expo-audio",
-      "expo-dev-client"
+      "expo-dev-client",
+      "expo-image-picker",
+      "expo-document-picker",
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true

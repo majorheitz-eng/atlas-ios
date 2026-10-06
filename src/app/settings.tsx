@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -8,6 +8,7 @@ import { loadBridgeConfig, saveBridgeConfig } from '@/lib/bridge/secure-config-s
 import { normalizeBridgeUrl } from '@/lib/bridge/normalize-bridge-url';
 import { palette } from '@/theme/palette';
 import { loadVoiceConfig, saveVoiceConfig } from '@/lib/voice/voice-config-store';
+import { runVoiceDiagnostics, type VoiceDiagStep } from '@/lib/voice/playback';
 
 export default function SettingsScreen() {
   const [baseUrl, setBaseUrl] = useState('');
@@ -15,12 +16,27 @@ export default function SettingsScreen() {
   const [testing, setTesting] = useState(false);
   const [voiceKey, setVoiceKey] = useState('');
   const [voiceId, setVoiceId] = useState('');
+  const [voiceTesting, setVoiceTesting] = useState(false);
+  const [voiceDiag, setVoiceDiag] = useState<VoiceDiagStep[]>([]);
 
   useEffect(() => {
     loadVoiceConfig().then((v) => {
       if (v) { setVoiceKey(v.apiKey); setVoiceId(v.voiceId); }
     });
   }, []);
+
+  const testVoice = async () => {
+    setVoiceTesting(true);
+    setVoiceDiag([]);
+    try {
+      const results = await runVoiceDiagnostics();
+      setVoiceDiag(results);
+      const allOk = results.every((s) => s.ok);
+      await Haptics.notificationAsync(allOk ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setVoiceTesting(false);
+    }
+  };
 
   const saveVoice = async () => {
     try {
@@ -73,7 +89,7 @@ export default function SettingsScreen() {
           <Text style={styles.title}>ATLAS LINK</Text>
           <View style={{ width: 28 }} />
         </View>
-        <View style={styles.content}>
+        <ScrollView style={styles.fill} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.badge}><Text style={styles.badgeText}>END-TO-END ENCRYPTED</Text></View>
           <Text style={styles.heading}>Connect to your Atlas</Text>
           <Text style={styles.copy}>Your provider keys stay on your home Hermes system. This app stores only the encrypted gateway address and a revocable access token in iPhone Keychain.</Text>
@@ -134,12 +150,24 @@ export default function SettingsScreen() {
           <Pressable onPress={saveVoice} style={styles.secondary}>
             <Text style={styles.secondaryText}>SAVE VOICE</Text>
           </Pressable>
+          <Pressable disabled={voiceTesting} onPress={testVoice} style={styles.secondary}>
+            <Text style={styles.secondaryText}>{voiceTesting ? 'TESTING…' : 'TEST VOICE'}</Text>
+          </Pressable>
+          {voiceDiag.length > 0 && (
+            <View style={styles.diagBox}>
+              {voiceDiag.map((s: VoiceDiagStep, i: number) => (
+                <Text key={i} style={[styles.diagLine, { color: s.ok ? palette.success : '#FF7A8A' }]}>
+                  {s.ok ? '✓' : '✕'} {s.step}{s.detail ? ` — ${s.detail}` : ''}
+                </Text>
+              ))}
+            </View>
+          )}
 
           <View style={styles.note}>
             <Text style={styles.noteTitle}>PRIVATE BY DESIGN</Text>
             <Text style={styles.noteText}>Microphone audio is transcribed by Apple on-device when supported. Only the transcript is sent to Atlas.</Text>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -165,4 +193,6 @@ const styles = StyleSheet.create({
   note: { marginTop: 23, padding: 16, borderLeftWidth: 2, borderLeftColor: palette.cyan, backgroundColor: 'rgba(8,33,43,0.58)' },
   noteTitle: { color: palette.cyan, fontSize: 10, letterSpacing: 1.5, fontWeight: '900', marginBottom: 6 },
   noteText: { color: palette.muted, fontSize: 12, lineHeight: 18 },
+  diagBox: { marginTop: 12, padding: 12, backgroundColor: 'rgba(8,31,42,0.9)', borderWidth: 1, borderColor: palette.line, borderRadius: 13 },
+  diagLine: { fontSize: 11, lineHeight: 18, fontFamily: 'monospace' },
 });

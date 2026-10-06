@@ -24,11 +24,14 @@ export async function synthesizeToFile(text: string, cfg: VoiceConfig): Promise<
       }),
     });
     if (!res.ok) return null;
+
+    // Write raw bytes directly — no base64 encoding. The old code built a
+    // binary string from char codes and wrote it with encoding:'base64',
+    // which corrupted every MP3 and caused the voice clone to be silently
+    // inaudible. file.write() accepts Uint8Array natively.
     const bytes = new Uint8Array(await res.arrayBuffer());
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
     const file = new File(Paths.cache, `atlas_reply_${Date.now()}.mp3`);
-    file.write(binary, { encoding: 'base64' });
+    file.write(bytes);
     return file.uri;
   } catch {
     return null;
