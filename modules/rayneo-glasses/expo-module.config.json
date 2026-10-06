@@ -1,15 +1,6 @@
 {
   "platforms": ["ios"],
   "ios": {
-    "modules": ["RayNeoGlassesModule"],
-    "frameworks": ["RayneoNet.framework"],
-    "embedFrameworks": ["RayneoNet.framework"],
-    "extraSources": [
-      "CoreABI.swift",
-      "MessageABI.swift",
-      "CoreMessageReceiver.swift",
-      "AssistantTextPrototype.swift",
-      "ProbeBridge.m"
-    ]
+    "modules": ["RayNeoGlassesModule"]
   }
 }
