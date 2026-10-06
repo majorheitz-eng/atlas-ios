@@ -58,7 +58,8 @@
     "web": "expo start --web",
     "test": "jest --runInBand",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "eas-build-post-install": "./scripts/eas-build-pre-install.sh"
   },
   "jest": {
     "preset": "jest-expo"

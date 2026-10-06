@@ -19,7 +19,6 @@
     },
     "production": {
       "autoIncrement": true,
-      "preInstallHook": "./scripts/eas-build-pre-install.sh",
       "android": {
         "buildType": "apk"
       }
