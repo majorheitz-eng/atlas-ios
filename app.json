@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.kendrickhome.atlas",
-      "buildNumber": "1",
+      "buildNumber": "3",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Allow Atlas to listen while you speak.",
         "NSSpeechRecognitionUsageDescription": "Allow Atlas to convert your voice to text.",
