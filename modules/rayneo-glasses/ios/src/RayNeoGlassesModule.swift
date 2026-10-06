@@ -1,4 +1,4 @@
-import Expo
+import ExpoModulesCore
 import CoreBluetooth
 import ExternalAccessory
 import Foundation
@@ -237,12 +237,12 @@ extension GlassesSDKManager: CBCentralManagerDelegate {
 
 // MARK: - Expo Module
 
-@objc(RayNeoGlassesModule)
-public final class RayNeoGlassesModule: ExpoModule {
+
+public final class RayNeoGlassesModule: Module {
   private var sdk = GlassesSDKManager.shared
   private var stateListeners = 0
 
-  public override func definition() -> ModuleDefinition {
+  public func definition() -> ModuleDefinition {
     Name("ExpoRayNeoGlasses")
     Events("onGlassesState")
 
