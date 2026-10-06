@@ -2,7 +2,7 @@ import Expo
 import CoreBluetooth
 import ExternalAccessory
 import Foundation
-import RayneoNet
+
 
 // MARK: - GATT Profile
 

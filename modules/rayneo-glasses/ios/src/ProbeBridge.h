@@ -1,6 +1,5 @@
 #import <Foundation/Foundation.h>
 #import <CoreBluetooth/CoreBluetooth.h>
-#include "NativeVoiceVAD.h"
 
 // Observed Objective-C interface in RayneoNet v1.2.35; no Apple private API.
 FOUNDATION_EXPORT NSString * _Nullable RNProbeIdentifier(NSData * _Nonnull data, BOOL connectable);

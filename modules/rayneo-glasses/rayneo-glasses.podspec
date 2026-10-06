@@ -1,6 +1,6 @@
 require 'json'
 
-package = JSON.parse(File.read(File.join(File.dirname(__FILE__), 'package.json'))
+package = JSON.parse(File.read(File.join(File.dirname(__FILE__), 'package.json')))
 
 Pod::Spec.new do |s|
   s.name           = 'rayneo-glasses'
