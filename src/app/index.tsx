@@ -422,13 +422,18 @@ export default function AtlasHomeScreen() {
     setConversationMode((prev) => {
       const next = !prev;
       conversationModeRef.current = next;
-      // (Re)entering conversation mode clears any prior block so the loop
-      // can run; leaving clears the pending auto-listen timer.
       if (next) {
         autoListenBlockedRef.current = false;
+        // Greet the user when entering conversation mode
+        setTimeout(() => {
+          void speakReply('Hello Major, how may I assist you?', () => {
+            dispatch({ type: 'SPEECH_FINISHED' });
+          });
+        }, 300);
       } else if (autoListenTimerRef.current) {
         clearTimeout(autoListenTimerRef.current);
         autoListenTimerRef.current = null;
+        Speech.stop();
       }
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       return next;
