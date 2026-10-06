@@ -36,6 +36,8 @@ import {
 import { HermesLongPollClient } from '@/lib/bridge/hermes-lp-client';
 import { resolveGateway } from '@/lib/bridge/gateway-resolver';
 import { speakReply } from '@/lib/voice/playback';
+import { glasses } from '@/lib/glasses/rayneo-bridge';
+import type { GlassesConnectionState } from '@/lib/glasses/rayneo-bridge';
 import type { BridgeConfig } from '@/lib/bridge/secure-config-store';
 import { palette } from '@/theme/palette';
 
@@ -49,6 +51,7 @@ export default function AtlasHomeScreen() {
   const [connectedUrl, setConnectedUrl] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [streamingReply, setStreamingReply] = useState('');
+  const [glassesState, setGlassesState] = useState<GlassesConnectionState | null>(null);
   const { listen } = useLocalSearchParams<{ listen?: string }>();
   const clientRef = useRef<HermesGatewayClient | null>(null);
   const autoStartedRef = useRef(false);
@@ -85,6 +88,14 @@ export default function AtlasHomeScreen() {
   );
 
   useEffect(() => () => clientRef.current?.disconnect(), []);
+
+  // Auto-connect RayNeo iO glasses on launch and track state.
+  useEffect(() => {
+    if (!glasses.available) return;
+    const unsub = glasses.onStateChange((event) => setGlassesState(event.state));
+    void glasses.connect().catch(() => {});
+    return () => { unsub(); };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
@@ -174,6 +185,8 @@ export default function AtlasHomeScreen() {
         createdAt: new Date().toISOString(),
       });
       await speakReply(reply, () => dispatch({ type: 'SPEECH_FINISHED' }));
+      // Push the reply to RayNeo iO glasses HUD (if connected).
+      void glasses.pushText(reply);
     } catch (error) {
       setStreamingReply('');
       dispatch({
@@ -263,6 +276,25 @@ export default function AtlasHomeScreen() {
           <View style={styles.linkLine} />
           <Text style={styles.privateText}>PRIVATE CHANNEL</Text>
         </View>
+
+        {/* Glasses link indicator — shows RayNeo iO HUD connection state. */}
+        {glasses.available && (
+          <View style={styles.glassesRow}>
+            <View style={[styles.statusDot, {
+              backgroundColor: glassesState === 'authenticated' ? palette.success
+                : glassesState === 'connected' ? palette.cyan
+                : glassesState === 'scanning' || glassesState === 'connecting' ? '#FFCA75'
+                : palette.muted
+            }]} />
+            <Text style={styles.glassesText}>
+              {glassesState === 'authenticated' ? 'GLASSES HUD · AUTH'
+                : glassesState === 'connected' ? 'GLASSES HUD · LINKED'
+                : glassesState === 'scanning' ? 'GLASSES · SCANNING…'
+                : glassesState === 'connecting' ? 'GLASSES · CONNECTING…'
+                : 'GLASSES · STANDBY'}
+            </Text>
+          </View>
+        )}
 
         {/* Connection banner: which URL actually connected. */}
         {connectedUrl && (
@@ -357,6 +389,8 @@ const styles = StyleSheet.create({
   linkText: { fontSize: 8, letterSpacing: 1.4, fontWeight: '900' },
   linkLine: { height: 1, flex: 1, backgroundColor: palette.line, marginHorizontal: 10 },
   privateText: { color: '#5E7D88', fontSize: 8, letterSpacing: 1.3, fontWeight: '700' },
+  glassesRow: { marginTop: 6, marginHorizontal: 22, flexDirection: 'row', alignItems: 'center' },
+  glassesText: { fontSize: 8, letterSpacing: 1.2, fontWeight: '700', color: '#5E7D88', marginLeft: 7 },
   chat: { flex: 1, marginTop: 15 },
   chatContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20, flexGrow: 1, justifyContent: 'flex-end' },
   welcome: { alignItems: 'center', paddingHorizontal: 23, marginBottom: 8 },
