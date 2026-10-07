@@ -10,11 +10,16 @@ Pod::Spec.new do |s|
   s.platforms      = { :ios => '16.0' }
   s.swift_version  = '5.0'
 
-  # Main module source — Expo module Swift + ObjC bridging header and source
-  s.source_files   = "ios/RayNeoModule.swift", "ios/ABI/ProbeBridge.h", "ios/ABI/ProbeBridge.m"
-  # ABI Swift files with @_silgen_name are excluded from compilation (they cause
-  # linker errors since RayneoNet.framework has no .swiftmodule). They're kept
-  # in the repo for reference and future swiftmodule emission.
+  # Main module source — Expo module Swift + ObjC dlsym bridge files.
+  # RayneoBridge.h/.m and RayneoBridge.swift replace the @_silgen_name ABI files,
+  # using dlsym to call RayneoNet.framework functions at runtime without a swiftmodule.
+  # ProbeBridge.h/.m provide the framework image verification (UUID check via dladdr).
+  s.source_files   = "ios/RayNeoModule.swift",
+                     "ios/ABI/RayneoBridge.h", "ios/ABI/RayneoBridge.m",
+                     "ios/ABI/RayneoBridge.swift",
+                     "ios/ABI/ProbeBridge.h", "ios/ABI/ProbeBridge.m"
+  # Old ABI Swift files with @_silgen_name are excluded from compilation (they
+  # require a .swiftmodule that doesn't exist). Kept for reference only.
   s.preserve_paths = "ios/ABI/**/*"
 
   s.vendored_frameworks = [

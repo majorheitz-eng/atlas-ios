@@ -97,6 +97,14 @@ type RayNeoNativeModule = {
   setDisplay(height: number, distance: number): Promise<void>;
   refreshSettings(): Promise<void>;
   getScanStatus(): Promise<string>;
+  startNotificationMirror(): Promise<void>;
+  stopNotificationMirror(): Promise<void>;
+  pushTextToGlasses(title: string, content: string): Promise<void>;
+  getSDKVersion(): Promise<string>;
+  getDeviceState(): Promise<Record<string, unknown>>;
+  reconnectBonded(): Promise<void>;
+  sendLyrics(did: string, text: string, speed: number): Promise<void>;
+  sendSpeedometer(speed: number, unit?: string | null): Promise<void>;
 };
 
 const NativeRayNeo = requireNativeModule<RayNeoNativeModule>('RayNeo');
@@ -234,6 +242,52 @@ export function getScanStatus(): Promise<string> {
   return NativeRayNeo.getScanStatus();
 }
 
+/** Start mirroring iOS notifications to the glasses HUD. */
+export function startNotificationMirror(): Promise<void> {
+  return NativeRayNeo.startNotificationMirror();
+}
+
+/** Stop notification mirroring. */
+export function stopNotificationMirror(): Promise<void> {
+  return NativeRayNeo.stopNotificationMirror();
+}
+
+/** Push a text card to the glasses immediately. */
+export function pushTextToGlasses(title: string, content: string): Promise<void> {
+  return NativeRayNeo.pushTextToGlasses(title, content);
+}
+
+/** Get the RayneoNet SDK version string (or "not loaded"). */
+export function getSDKVersion(): Promise<string> {
+  return NativeRayNeo.getSDKVersion();
+}
+
+/** Query the current device connection state from the SDK. */
+export function getDeviceState(): Promise<Record<string, unknown>> {
+  return NativeRayNeo.getDeviceState();
+}
+
+/** Reconnect to the single bonded glasses device. */
+export function reconnectBonded(): Promise<void> {
+  return NativeRayNeo.reconnectBonded();
+}
+
+/**
+ * Send lyrics to the glasses HUD (business 20, teleprompter type 2).
+ * `did` is a session identifier, `speed` is WPM (60–240).
+ */
+export function sendLyrics(did: string, text: string, speed: number): Promise<void> {
+  return NativeRayNeo.sendLyrics(did, text, speed);
+}
+
+/**
+ * Send a speedometer update to the glasses HUD (business 15, type 2).
+ * `speed` is the current speed value; `unit` defaults to "km/h".
+ */
+export function sendSpeedometer(speed: number, unit?: string | null): Promise<void> {
+  return NativeRayNeo.sendSpeedometer(speed, unit ?? null);
+}
+
 /**
  * Subscribe to RayNeo connection lifecycle / inbound events.
  *
@@ -304,4 +358,12 @@ export default {
   onSettings,
   onError,
   getScanStatus,
+  startNotificationMirror,
+  stopNotificationMirror,
+  pushTextToGlasses,
+  getSDKVersion,
+  getDeviceState,
+  reconnectBonded,
+  sendLyrics,
+  sendSpeedometer,
 };
