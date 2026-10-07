@@ -20,8 +20,12 @@
         "NSLocationWhenInUseUsageDescription": "Atlas uses your location for the speedometer HUD on your glasses.",
         "NSBluetoothAlwaysUsageDescription": "Atlas uses Bluetooth to connect to your RayNeo iO glasses and display responses on the HUD.",
         "NSBluetoothPeripheralUsageDescription": "Atlas uses Bluetooth to connect to your RayNeo iO glasses.",
-        "UISupportedExternalAccessoryProtocols": ["com.rayneo.venus.pub"],
-        "UIBackgroundModes": ["bluetooth-central"],
+        "UISupportedExternalAccessoryProtocols": [
+          "com.rayneo.venus.pub"
+        ],
+        "UIBackgroundModes": [
+          "bluetooth-central"
+        ],
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
@@ -52,8 +56,7 @@
       "expo-audio",
       "expo-image-picker",
       "expo-document-picker",
-      "expo-location",
-      "expo-notifications"
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true
