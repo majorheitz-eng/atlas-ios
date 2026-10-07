@@ -10,8 +10,12 @@ Pod::Spec.new do |s|
   s.platforms      = { :ios => '16.0' }
   s.swift_version  = '5.0'
 
-  # Main module source — only the Expo module Swift file, no ABI files
-  s.source_files   = "ios/RayNeoModule.swift"
+  # Main module source — Expo module Swift + ObjC bridging header and source
+  s.source_files   = "ios/RayNeoModule.swift", "ios/ABI/ProbeBridge.h", "ios/ABI/ProbeBridge.m"
+  # ABI Swift files with @_silgen_name are excluded from compilation (they cause
+  # linker errors since RayneoNet.framework has no .swiftmodule). They're kept
+  # in the repo for reference and future swiftmodule emission.
+  s.preserve_paths = "ios/ABI/**/*"
 
   s.vendored_frameworks = [
     'ios/Frameworks/RayneoNet.framework',
@@ -27,6 +31,7 @@ Pod::Spec.new do |s|
 
   # Add the declaration-only swiftmodule path so `import RayneoNet` resolves
   s.pod_target_xcconfig = {
+    'SWIFT_OBJC_BRIDGING_HEADER' => '$(PODS_ROOT)/RayNeo/ios/ABI/ProbeBridge.h',
     'LD_RUNPATH_SEARCH_PATHS' => '$(inherited) @executable_path/Frameworks'
   }
 
