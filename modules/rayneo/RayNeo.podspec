@@ -45,7 +45,7 @@ Pod::Spec.new do |s|
 
   # Add the declaration-only swiftmodule path so `import RayneoNet` resolves
   s.pod_target_xcconfig = {
-    'SWIFT_INCLUDE_PATHS' => '$(inherited) $(PODS_ROOT)/RayNeo/ios/ABI/build',
+    'SWIFT_INCLUDE_PATHS' => '$(inherited) ${PODS_ROOT}/../../modules/rayneo/ios/ABI/build',
     'LD_RUNPATH_SEARCH_PATHS' => '$(inherited) @executable_path/Frameworks'
   }
 
