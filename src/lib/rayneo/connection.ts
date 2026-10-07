@@ -215,13 +215,13 @@ export function useRayNeo(): UseRayNeo {
       setDevices([]);
       setStatus('scanning');
       await native.startCentral();
-      await native.startScan(10000);
+      await native.startScan(15000);
       // The native scan auto-stops after the timeout. Reset status after
       // a delay so the UI doesn't stay in "scanning" forever if no devices
       // are found.
       setTimeout(() => {
         setStatus((s) => (s === 'scanning' ? 'idle' : s));
-      }, 11000);
+      }, 16000);
     } catch {
       setStatus('idle');
     }

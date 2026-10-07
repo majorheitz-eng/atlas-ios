@@ -481,6 +481,7 @@ public class RayNeoModule: Module {
 
     // 2. Also scan via BLE for new/unbonded devices
     guard let central, central.state == .poweredOn else {
+      sendEvent("error", ["kind": "bluetooth", "message": "Bluetooth not powered on (state: \(central?.state.rawValue ?? -1)). Enable Bluetooth and try again."])
       return ["scanning": false, "sdkLoaded": core != nil]
     }
 
@@ -545,10 +546,22 @@ public class RayNeoModule: Module {
       ])
     }
 
+    // Scan with the known B81D service AND without filter (fallback)
     central.scanForPeripherals(
       withServices: [RayNeoIOProfile.service],
       options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
     )
+    // Also do an unfiltered scan after 1s — the glasses may not advertise
+    // the B81D service when in pairing mode (unpaired).
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+      guard let self, self.central?.isScanning == true else { return }
+      self.central?.stopScan()
+      self.central?.scanForPeripherals(
+        withServices: nil,
+        options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
+      )
+      self.sendEvent("connectionState", ["state": "scanningUnfiltered"])
+    }
     if let timeoutMs, timeoutMs > 0 {
       DispatchQueue.main.asyncAfter(deadline: .now() + Double(timeoutMs) / 1000.0) { [weak self] in
         guard let self, self.central?.isScanning == true else { return }
