@@ -128,42 +128,45 @@ void *RayneoBridgeFindDevice(void *core, RayneoSwiftString deviceID) {
 }
 
 // discover() throws
-BOOL RayneoBridgeDiscover(void *core, NSError **error) {
+BOOL RayneoBridgeDiscover(void *core) {
     void *address = dlsym(RTLD_DEFAULT, "$s9RayneoNet13RNCoreConnectC13discoverStart7filters11retrieveIdsySayAA15RNDiscoveryTypeOGSg_SaySSGSgtKF");
     if (!address) { return NO; }
     RayneoSwiftArray nilArray = {NULL, 0, 0};
-    void (*discoverer)(RayneoSwiftArray, RayneoSwiftArray, void *, NSError **) __attribute__((swiftcall)) __attribute__((swift_context)) = (void(*)(RayneoSwiftArray, RayneoSwiftArray, void *, NSError **))address;
-    discoverer(nilArray, nilArray, core, error);
-    return *error == nil;
+    typedef void (*Discoverer)(RayneoSwiftArray, RayneoSwiftArray, void *)
+                 __attribute__((swiftcall)) __attribute__((swift_context));
+    ((Discoverer)address)(nilArray, nilArray, core);
+    return YES;
 }
 
 // connect(_ device: RNDevice, userID: String, type: RNDeviceConnectType) throws
 BOOL RayneoBridgeConnectBLE(void *core, void *device,
-                             RayneoSwiftString userID, uint8_t type,
-                             NSError **error) {
+                             RayneoSwiftString userID, uint8_t type) {
     void *address = dlsym(RTLD_DEFAULT, "$s9RayneoNet13RNCoreConnectC3cmd7connect6userId_yAA8RNDeviceC_SSAA0iD4TypeOtKF");
     if (!address) { return NO; }
-    void (*connector)(void *, RayneoSwiftString, uint8_t, void *, NSError **) __attribute__((swiftcall)) __attribute__((swift_context)) = (void(*)(void *, RayneoSwiftString, uint8_t, void *, NSError **))address;
-    connector(device, userID, type, core, error);
-    return *error == nil;
+    typedef void (*Connector)(void *, RayneoSwiftString, uint8_t, void *)
+                 __attribute__((swiftcall)) __attribute__((swift_context));
+    ((Connector)address)(device, userID, type, core);
+    return YES;
 }
 
 // unbind(_ device: RNDevice) throws
-BOOL RayneoBridgeUnbind(void *core, void *device, NSError **error) {
+BOOL RayneoBridgeUnbind(void *core, void *device) {
     void *address = dlsym(RTLD_DEFAULT, "$s9RayneoNet13RNCoreConnectC3cmd7unboundyAA8RNDeviceC_tKF");
     if (!address) { return NO; }
-    void (*unbinder)(void *, void *, NSError **) __attribute__((swiftcall)) __attribute__((swift_context)) = (void(*)(void *, void *, NSError **))address;
-    unbinder(device, core, error);
-    return *error == nil;
+    typedef void (*Unbinder)(void *, void *)
+                 __attribute__((swiftcall)) __attribute__((swift_context));
+    ((Unbinder)address)(device, core);
+    return YES;
 }
 
 // sendMessage(_ message: RNMessage) throws
-BOOL RayneoBridgeSendMessage(void *core, void *message, NSError **error) {
+BOOL RayneoBridgeSendMessage(void *core, void *message) {
     void *address = dlsym(RTLD_DEFAULT, "$s9RayneoNet13RNCoreConnectC4send7messageyAA9RNMessageC_tKF");
     if (!address) { return NO; }
-    void (*sender)(void *, void *, NSError **) __attribute__((swiftcall)) __attribute__((swift_context)) = (void(*)(void *, void *, NSError **))address;
-    sender(message, core, error);
-    return *error == nil;
+    typedef void (*Sender)(void *, void *)
+                 __attribute__((swiftcall)) __attribute__((swift_context));
+    ((Sender)address)(message, core);
+    return YES;
 }
 
 // setAccountID(_ value: String)
