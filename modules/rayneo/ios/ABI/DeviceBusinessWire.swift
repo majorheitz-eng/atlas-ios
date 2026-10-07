@@ -1,9 +1,8 @@
 import Foundation
 import CoreFoundation
 
+
 /// Version-pinned business envelope. Never a transport frame or authentication API.
-/// Copied from Turbo-IO rayneo-protocol. The `import RayNeoProtocol` was removed
-/// because all sources are compiled together in the same pod module.
 struct DeviceBusinessWire {
     let type: UInt32
     let json: [String: Any]
@@ -70,14 +69,14 @@ enum DeviceFeatureError: LocalizedError {
     case invalidPacket, disconnected, busy, noSession, incomplete, conflictingBytes, storageLimit, unsupportedFile
     var errorDescription: String? {
         switch self {
-        case .invalidPacket: return "Protocol field invalid; not sent or applied."
-        case .disconnected: return "Need a single authenticated glasses connection; simulator will not send."
-        case .busy: return "Please finish the current voice session or glasses task first."
-        case .noSession: return "No matching local task; other device content not modified."
-        case .incomplete: return "Recording is missing completion or has data gaps; original preserved."
-        case .conflictingBytes: return "Different bytes received at same recording offset; stopped."
-        case .storageLimit: return "Local receive limit exceeded; no glasses files deleted."
-        case .unsupportedFile: return "Audio packet format validation failed; original preserved."
+        case .invalidPacket: return "协议字段无效，未发送或应用。"
+        case .disconnected: return "需要唯一已认证的眼镜连接；模拟器不会发包。"
+        case .busy: return "请先结束语音会话或当前眼镜任务。"
+        case .noSession: return "没有匹配的本机任务，未修改其他设备内容。"
+        case .incomplete: return "录音缺少完成消息或存在数据空洞；原始文件已保留，不标完整。"
+        case .conflictingBytes: return "同一录音位置收到不同字节，已停止封装并保留原件。"
+        case .storageLimit: return "超过本机接收限制，已停止新增接收；没有删除眼镜文件。"
+        case .unsupportedFile: return "音频包格式未通过验证；保留原始文件，不生成伪成功音频。"
         }
     }
 }
