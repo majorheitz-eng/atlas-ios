@@ -446,8 +446,13 @@ public class RayNeoModule: Module {
     ensureCentral()
     loadCore()
 
-    // 1. Check SDK bonded/linked devices first (primary path)
+    // 1. SDK discover — tells the SDK to search for bonded/known devices
+    //    This is critical: without discover(), bondedDevices() and linkedDevices()
+    //    return empty. Turbo-IO calls sdkDiscovery() before scanning.
     if let core = core {
+      do { try core.discover() } catch { /* non-fatal, SDK may already be discovering */ }
+
+      // Check SDK bonded/linked devices (primary path)
       if let bonded = core.bondedDevices() {
         for device in bonded {
           sendEvent("scanResult", [
@@ -479,6 +484,57 @@ public class RayNeoModule: Module {
       return ["scanning": false, "sdkLoaded": core != nil]
     }
 
+    // 3. Delayed SDK re-check: discover() is async — the SDK needs a few seconds
+    //    to find bonded devices via MFi. Re-check bondedDevices after 2s, 5s, 10s.
+    if let core = core {
+      for delay in [2.0, 5.0, 10.0] {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+          guard let self else { return }
+          if let bonded = core.bondedDevices(), bonded.count == 1 {
+            let device = bonded[0]
+            self.sendEvent("scanResult", [
+              "id": "sdk-\(device.deviceID())",
+              "name": device.name(),
+              "rssi": 0,
+              "bonded": true,
+              "connected": device.isConnected(),
+              "bleState": Int(device.bleStateByte()),
+            ])
+            // Auto-connect the single bonded device (Turbo-IO pattern)
+            if !device.isConnected() {
+              do { try core.connectBLE(device); self.sendEvent("connectionState", ["state": "connecting", "deviceID": device.deviceID()]) }
+              catch { /* non-fatal */ }
+            } else if device.bleStateByte() == 9 {
+              self.sendEvent("connectionState", ["state": "connected", "deviceID": device.deviceID(), "authenticated": true])
+            }
+          } else if let bonded = core.bondedDevices() {
+            for device in bonded {
+              self.sendEvent("scanResult", [
+                "id": "sdk-\(device.deviceID())",
+                "name": device.name(),
+                "rssi": 0,
+                "bonded": true,
+                "connected": device.isConnected(),
+                "bleState": Int(device.bleStateByte()),
+              ])
+            }
+          }
+          if let linked = core.linkedDevices() {
+            for device in linked {
+              self.sendEvent("scanResult", [
+                "id": "sdk-\(device.deviceID())",
+                "name": device.name(),
+                "rssi": 0,
+                "linked": true,
+                "connected": device.isConnected(),
+                "bleState": Int(device.bleStateByte()),
+              ])
+            }
+          }
+        }
+      }
+    }
+
     let connected = central.retrieveConnectedPeripherals(withServices: [RayNeoIOProfile.service])
     for p in connected {
       discoveredPeripherals[p.identifier] = p
@@ -491,7 +547,7 @@ public class RayNeoModule: Module {
 
     central.scanForPeripherals(
       withServices: [RayNeoIOProfile.service],
-      options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
+      options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
     )
     if let timeoutMs, timeoutMs > 0 {
       DispatchQueue.main.asyncAfter(deadline: .now() + Double(timeoutMs) / 1000.0) { [weak self] in
