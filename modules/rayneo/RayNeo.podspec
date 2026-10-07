@@ -31,7 +31,7 @@ Pod::Spec.new do |s|
 
   # Add the declaration-only swiftmodule path so `import RayneoNet` resolves
   s.pod_target_xcconfig = {
-    'SWIFT_OBJC_BRIDGING_HEADER' => '$(PODS_ROOT)/RayNeo/ios/ABI/ProbeBridge.h',
+    'SWIFT_OBJC_BRIDGING_HEADER' => '$(PODS_ROOT)/Headers/Private/RayNeo/ProbeBridge.h',
     'LD_RUNPATH_SEARCH_PATHS' => '$(inherited) @executable_path/Frameworks'
   }
 
