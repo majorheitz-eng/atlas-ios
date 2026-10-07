@@ -34,14 +34,11 @@ FOUNDATION_EXPORT void * _Nullable RayneoBridgeBondedDeviceAt(void * _Nonnull co
 FOUNDATION_EXPORT uint64_t RayneoBridgeLinkedDeviceCount(void * _Nonnull core);
 FOUNDATION_EXPORT void * _Nullable RayneoBridgeLinkedDeviceAt(void * _Nonnull core, uint64_t index);
 FOUNDATION_EXPORT void * _Nullable RayneoBridgeFindDevice(void * _Nonnull core, RayneoSwiftString deviceID);
-FOUNDATION_EXPORT BOOL RayneoBridgeDiscover(void * _Nonnull core, NSError * _Nullable * _Nullable error);
+FOUNDATION_EXPORT BOOL RayneoBridgeDiscover(void * _Nonnull core);
 FOUNDATION_EXPORT BOOL RayneoBridgeConnectBLE(void * _Nonnull core, void * _Nonnull device,
-                                              RayneoSwiftString userID, uint8_t type,
-                                              NSError * _Nullable * _Nullable error);
-FOUNDATION_EXPORT BOOL RayneoBridgeUnbind(void * _Nonnull core, void * _Nonnull device,
-                                           NSError * _Nullable * _Nullable error);
-FOUNDATION_EXPORT BOOL RayneoBridgeSendMessage(void * _Nonnull core, void * _Nonnull message,
-                                                NSError * _Nullable * _Nullable error);
+                                              RayneoSwiftString userID, uint8_t type);
+FOUNDATION_EXPORT BOOL RayneoBridgeUnbind(void * _Nonnull core, void * _Nonnull device);
+FOUNDATION_EXPORT BOOL RayneoBridgeSendMessage(void * _Nonnull core, void * _Nonnull message);
 FOUNDATION_EXPORT void RayneoBridgeSetAccountID(void * _Nonnull core, RayneoSwiftString accountID);
 FOUNDATION_EXPORT RayneoSwiftString RayneoBridgeShareFile(void * _Nonnull core, NSURL * _Nonnull url,
                                                             RayneoSwiftString deviceID, uint8_t target,

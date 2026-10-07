@@ -111,30 +111,22 @@ final class CoreHandle {
     // MARK: Connection
 
     func discover() throws {
-        var error: NSError?
-        _ = RayneoBridgeDiscover(pointer, &error)
-        if let error = error { throw error }
+        _ = RayneoBridgeDiscover(pointer)
     }
 
     func connectBLE(_ device: DeviceHandle) throws {
-        var error: NSError?
         let userID = swiftStringToRayneo("")
-        _ = RayneoBridgeConnectBLE(pointer, device.pointer, userID, 0, &error)
-        if let error = error { throw error }
+        _ = RayneoBridgeConnectBLE(pointer, device.pointer, userID, 0)
     }
 
     func unbind(_ device: DeviceHandle) throws {
-        var error: NSError?
-        _ = RayneoBridgeUnbind(pointer, device.pointer, &error)
-        if let error = error { throw error }
+        _ = RayneoBridgeUnbind(pointer, device.pointer)
     }
 
     // MARK: Messaging
 
     func sendMessage(_ message: MessageHandle) throws {
-        var error: NSError?
-        _ = RayneoBridgeSendMessage(pointer, message.pointer, &error)
-        if let error = error { throw error }
+        _ = RayneoBridgeSendMessage(pointer, message.pointer)
     }
 
     // MARK: Account
