@@ -124,7 +124,12 @@ export function useRayNeo(): UseRayNeo {
       try {
         const s = await native.getScanStatus();
         if (active && ['idle','scanning','connecting','connected','disconnected','unavailable'].includes(s)) {
-          setStatus(s as RayNeoScanStatus);
+          // Don't override 'scanning' or 'connecting' status from the poll —
+          // these are set by user actions and should persist until the action completes.
+          setStatus((prev) => {
+            if (prev === 'scanning' || prev === 'connecting') return prev;
+            return s as RayNeoScanStatus;
+          });
         }
       } catch {
         /* swallow — keep last known status */
