@@ -1,8 +1,10 @@
 // Reply playback: ElevenLabs (Major Atlas clone) when configured, on-device TTS fallback.
 //
-// STREAMING: createStreamingSpeaker() speaks sentence chunks as they stream in,
-// so the voice starts while the text is still arriving (no "show all, then talk").
-// speakReply() is kept for complete replies.
+// STREAMING: createStreamingSpeaker() accumulates the streamed reply and
+// synthesizes the COMPLETE text in a single ElevenLabs call when finish()
+// fires — one network round-trip instead of one per sentence.
+// speakReply() is kept for complete (non-streamed) replies; speakGreeting()
+// uses instant on-device TTS for the conversation-mode greeting.
 import * as Speech from 'expo-speech';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { loadVoiceConfig } from './voice-config-store';
@@ -146,126 +148,117 @@ export async function speakReply(text: string, onDone: () => void): Promise<void
   }
 }
 
-/** Split streaming text into speakable chunks at sentence boundaries. */
-export function takeSpeakableChunks(buffer: string, force: boolean): { chunks: string[]; rest: string } {
-  const chunks: string[] = [];
-  const re = /[^.!?…\n]*[.!?…\n]+/g;
-  let m: RegExpExecArray | null;
-  let consumed = 0;
-  while ((m = re.exec(buffer)) !== null) {
-    if (m[0].trim().length >= 1) {
-      chunks.push(m[0]);
-      consumed += m[0].length;
-    }
-  }
-  let rest = buffer.slice(consumed);
-  if (force && rest.trim()) {
-    chunks.push(rest);
-    rest = '';
-  }
-  return { chunks, rest };
-}
-
 /**
- * Streaming speech: feed accumulated reply text as it streams; complete
- * sentences get queued and spoken in order while the rest is still arriving.
- * Call finish() when message.complete fires.
+ * Streaming speech: accumulate the full reply text as it streams in, then
+ * synthesize the COMPLETE reply in a single ElevenLabs call when finish()
+ * fires. Previously each sentence chunk triggered its own API call (N
+ * sequential network round-trips), making replies painfully slow. One call
+ * for the whole reply is faster overall and lets the voice clone produce
+ * natural prosody across sentence boundaries.
  */
 export function createStreamingSpeaker() {
-  let spokenLen = 0; // chars already queued to the speech queue
-  const queue: string[] = [];
-  let speaking = false;
   let myGeneration = -1;
-  let finished = false;
+  let fullText = '';
   let onAllDone: (() => void) | null = null;
 
-  const drain = async () => {
-    if (speaking) return;
-    speaking = true;
-    while (queue.length > 0) {
-      const chunk = queue.shift()!;
-      const stored = await loadVoiceConfig();
-      const cfg = stored ?? { apiKey: ATLAS_VOICE.apiKey, voiceId: ATLAS_VOICE.voiceId };
-      if (cfg?.apiKey && cfg?.voiceId) {
-        try {
-          await ensureAudioMode();
-          const uri = await synthesizeToFile(chunk, cfg);
-          if (uri) {
-            if (generation !== myGeneration) { speaking = false; return; }
-            await playMp3(uri, () => {});
-            continue;
-          }
-        } catch { /* fall through */ }
-      }
-      // expo-speech fallback per chunk
-      await new Promise<void>((resolve) => {
-        try {
-          Speech.speak(chunk, {
-            language: 'en-US',
-            rate: 0.96,
-            pitch: 0.93,
-            onDone: () => resolve(),
-            onStopped: () => resolve(),
-            onError: () => resolve(),
-          });
-        } catch (e) {
-          console.warn('Speech.speak chunk failed:', e);
-          resolve();
-        }
-      });
-      if (generation !== myGeneration) { speaking = false; return; }
-    }
-    speaking = false;
-    if (finished && queue.length === 0 && onAllDone) {
+  const resolveDone = () => {
+    if (onAllDone) {
       const cb = onAllDone;
       onAllDone = null;
       cb();
     }
   };
 
+  /** Synthesize + play the entire reply in one shot. */
+  const playAll = async () => {
+    if (generation !== myGeneration) { resolveDone(); return; }
+    const text = fullText.trim();
+    if (!text) { resolveDone(); return; }
+
+    const stored = await loadVoiceConfig();
+    const cfg = stored ?? { apiKey: ATLAS_VOICE.apiKey, voiceId: ATLAS_VOICE.voiceId };
+    if (cfg?.apiKey && cfg?.voiceId) {
+      try {
+        await ensureAudioMode();
+        const uri = await synthesizeToFile(text, cfg);
+        if (uri) {
+          if (generation !== myGeneration) { resolveDone(); return; }
+          await playMp3(uri, () => {});
+          resolveDone();
+          return;
+        }
+      } catch { /* fall through to expo-speech */ }
+    }
+    // expo-speech fallback for the whole reply (single call)
+    await new Promise<void>((resolve) => {
+      try {
+        Speech.speak(text, {
+          language: 'en-US',
+          rate: 0.96,
+          pitch: 0.93,
+          onDone: () => resolve(),
+          onStopped: () => resolve(),
+          onError: () => resolve(),
+        });
+      } catch (e) {
+        console.warn('Speech.speak (full reply) failed:', e);
+        resolve();
+      }
+    });
+    resolveDone();
+  };
+
   return {
     start() {
       myGeneration = ++generation;
-      queue.length = 0;
-      spokenLen = 0;
-      speaking = false;
-      finished = false;
+      fullText = '';
       onAllDone = null;
     },
-    /** Feed the FULL accumulated reply text so far; new complete sentences are queued. */
+    /** Track the full accumulated reply text; no synthesis during streaming. */
     push(accumulated: string) {
       if (generation !== myGeneration) return;
-      const fresh = accumulated.slice(spokenLen);
-      if (!fresh) return;
-      const { chunks, rest } = takeSpeakableChunks(fresh, false);
-      if (chunks.length) {
-        for (const c of chunks) {
-          queue.push(c);
-          spokenLen += c.length;
-        }
-        void drain();
-      }
+      fullText = accumulated;
     },
-    /** Flush the remaining tail and resolve when all speech is done. */
+    /** Synthesize the complete reply in one call and resolve when done. */
     finish(accumulated: string, onDone: () => void) {
       if (generation !== myGeneration) { onDone(); return; }
-      const tail = accumulated.slice(spokenLen);
-      if (tail.trim()) {
-        queue.push(tail);
-        spokenLen = accumulated.length;
-      }
-      finished = true;
+      fullText = accumulated;
       onAllDone = onDone;
-      void drain();
-      if (!speaking && queue.length === 0) {
-        onAllDone = null;
-        onDone();
-      }
+      void playAll();
     },
     cancel() {
       stopPlayback();
     },
   };
+}
+
+/** Instant on-device greeting — bypasses ElevenLabs entirely so the
+ *  greeting starts immediately and finishes reliably. This arms the
+ *  auto-listen loop without waiting for a network TTS round-trip. */
+export function speakGreeting(text: string, onDone: () => void): void {
+  stopPlayback();
+  let settled = false;
+  const finish = () => {
+    if (settled) return;
+    settled = true;
+    onDone();
+  };
+  // Hard cap — onDone is not always called on iOS (expo-speech quirk).
+  const timer = setTimeout(finish, 15_000);
+  try {
+    Speech.speak(text, {
+      language: 'en-US',
+      rate: 0.96,
+      pitch: 0.93,
+      onDone: () => { clearTimeout(timer); finish(); },
+      onStopped: () => { clearTimeout(timer); finish(); },
+      onError: () => { clearTimeout(timer); finish(); },
+    });
+  } catch (e) {
+    console.warn('Speech.speak (greeting) failed:', e);
+    clearTimeout(timer);
+    finish();
+  }
 }
 
 

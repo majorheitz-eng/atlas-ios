@@ -35,7 +35,7 @@ import {
 } from '@/lib/bridge/hermes-gateway-client';
 import { HermesLongPollClient } from '@/lib/bridge/hermes-lp-client';
 import { resolveGateway } from '@/lib/bridge/gateway-resolver';
-import { speakReply, createStreamingSpeaker } from '@/lib/voice/playback';
+import { speakGreeting, createStreamingSpeaker } from '@/lib/voice/playback';
 
 // Lazy-loaded pickers — guarded so a missing native module can't crash the app.
 let ImagePicker: typeof import('expo-image-picker') | null = null;
@@ -186,12 +186,16 @@ export default function AtlasHomeScreen() {
     }
   });
   useSpeechRecognitionEvent('error', (event) => {
+    // 'aborted' fires when we intentionally stop the recognizer to submit a
+    // final transcript (see submit()). Treating it as LISTENING_STOPPED would
+    // force the phase back to 'idle' while we're transitioning to 'thinking',
+    // which short-circuits the auto-listen loop. Only react to genuine errors.
     if (event.error !== 'aborted' && event.error !== 'no-speech') {
       Alert.alert('Voice unavailable', event.message || 'Atlas could not access speech recognition.');
       // Only block auto-listen on genuine errors, not transient no-speech/aborted
       autoListenBlockedRef.current = true;
+      dispatch({ type: 'LISTENING_STOPPED' });
     }
-    dispatch({ type: 'LISTENING_STOPPED' });
   });
 
   const requestApproval = useCallback((request: ApprovalRequest) => {
@@ -437,7 +441,7 @@ export default function AtlasHomeScreen() {
         // fires the auto-listen effect and re-arms the mic.
         dispatch({ type: 'GREETING_STARTED' });
         setTimeout(() => {
-          void speakReply('Hello Major, how may I assist you?', () => {
+          void speakGreeting('Hello Major, how may I assist you?', () => {
             dispatch({ type: 'SPEECH_FINISHED' });
           });
         }, 300);
@@ -473,7 +477,7 @@ export default function AtlasHomeScreen() {
         dispatch({ type: 'GREETING_STARTED' });
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setTimeout(() => {
-          void speakReply('Hello Major, how may I assist you?', () => {
+          void speakGreeting('Hello Major, how may I assist you?', () => {
             dispatch({ type: 'SPEECH_FINISHED' });
           });
         }, 300);
