@@ -8,9 +8,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import { palette } from '@/theme/palette';
 import { useRayNeo } from '@/lib/rayneo/connection';
+import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
+
+// Use native notification observer directly (no expo-notifications dependency)
+const notificationEmitter = Platform.OS === 'ios' ? new NativeEventEmitter() : null;
 
 interface MessageItem {
   id: string;
@@ -27,27 +30,31 @@ export default function MessagesScreen() {
   const messagesRef = useRef<MessageItem[]>([]);
   const rayneo = useRayNeo();
 
-  // Capture incoming notifications
+  // Capture incoming notifications via native iOS notification observer
   useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener((notification) => {
-      const title = notification.request.content.title ?? 'Notification';
-      const body = notification.request.content.body ?? '';
-      const app = (notification.request.content.data as any)?.appId ?? 'Unknown';
-      const item: MessageItem = {
-        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        title, body, app,
-        timestamp: Date.now(),
-        read: false,
-      };
-      messagesRef.current = [item, ...messagesRef.current].slice(0, 50);
-      setMessages(messagesRef.current);
-      // Push to glasses
-      if (body) {
-        void rayneo.sendNotification(`${title}: ${body}`);
+    // Listen for notifications via the native module's event emitter
+    // The RayNeo native module captures iOS notifications and emits them
+    const subscription = notificationEmitter?.addListener(
+      'notificationReceived',
+      (event: { title?: string; body?: string; app?: string }) => {
+        const title = event.title ?? 'Notification';
+        const body = event.body ?? '';
+        const app = event.app ?? 'Unknown';
+        const item: MessageItem = {
+          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          title, body, app,
+          timestamp: Date.now(),
+          read: false,
+        };
+        messagesRef.current = [item, ...messagesRef.current].slice(0, 50);
+        setMessages(messagesRef.current);
+        if (body) {
+          void rayneo.sendNotification(`${title}: ${body}`);
+        }
       }
-    });
+    );
 
-    return () => subscription.remove();
+    return () => subscription?.remove();
   }, [rayneo]);
 
   // Auto-push selected message to glasses as a notification card

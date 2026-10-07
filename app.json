@@ -56,8 +56,7 @@
       "expo-audio",
       "expo-image-picker",
       "expo-document-picker",
-      "expo-location",
-      "expo-notifications"
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true
