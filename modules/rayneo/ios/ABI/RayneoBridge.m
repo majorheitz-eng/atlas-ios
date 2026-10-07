@@ -128,59 +128,55 @@ void *RayneoBridgeFindDevice(void *core, RayneoSwiftString deviceID) {
 }
 
 // discover() throws
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswift_error_attribute"
 BOOL RayneoBridgeDiscover(void *core, NSError **error) {
     void *address = dlsym(RTLD_DEFAULT, "$s9RayneoNet13RNCoreConnectC13discoverStart7filters11retrieveIdsySayAA15RNDiscoveryTypeOGSg_SaySSGSgtKF");
     if (!address) { return NO; }
-    // discoverStart(filters: [RNDiscoveryType]?, retrieveIDs: [String]?) throws
-    // [RNDiscoveryType]? nil = (NULL, 0, 0); [String]? nil = (NULL, 0, 0)
-    typedef void (*Discoverer)(RayneoSwiftArray filters, RayneoSwiftArray retrieveIDs,
-                                void *self, NSError **error)
-                 __attribute__((swiftcall))
-                 __attribute__((swift_context));
-
     RayneoSwiftArray nilArray = {NULL, 0, 0};
-    ((Discoverer)address)(nilArray, nilArray, core, error);
+    void (*discoverer)(RayneoSwiftArray, RayneoSwiftArray, void *, NSError **) __attribute__((swiftcall)) __attribute__((swift_context)) __attribute__((swift_error(not_nil))) = (void(*)(RayneoSwiftArray, RayneoSwiftArray, void *, NSError **))address;
+    discoverer(nilArray, nilArray, core, error);
     return *error == nil;
 }
+#pragma clang diagnostic pop
 
 // connect(_ device: RNDevice, userID: String, type: RNDeviceConnectType) throws
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswift_error_attribute"
 BOOL RayneoBridgeConnectBLE(void *core, void *device,
                              RayneoSwiftString userID, uint8_t type,
                              NSError **error) {
     void *address = dlsym(RTLD_DEFAULT, "$s9RayneoNet13RNCoreConnectC3cmd7connect6userId_yAA8RNDeviceC_SSAA0iD4TypeOtKF");
     if (!address) { return NO; }
-    typedef void (*Connector)(void *device, RayneoSwiftString userID, uint8_t type,
-                              void *self, NSError **error)
-                 __attribute__((swiftcall))
-                 __attribute__((swift_context));
-
-    ((Connector)address)(device, userID, type, core, error);
+    void (*connector)(void *, RayneoSwiftString, uint8_t, void *, NSError **) __attribute__((swiftcall)) __attribute__((swift_context)) __attribute__((swift_error(not_nil))) = (void(*)(void *, RayneoSwiftString, uint8_t, void *, NSError **))address;
+    connector(device, userID, type, core, error);
     return *error == nil;
 }
+#pragma clang diagnostic pop
 
 // unbind(_ device: RNDevice) throws
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswift_error_attribute"
 BOOL RayneoBridgeUnbind(void *core, void *device, NSError **error) {
     void *address = dlsym(RTLD_DEFAULT, "$s9RayneoNet13RNCoreConnectC3cmd7unboundyAA8RNDeviceC_tKF");
     if (!address) { return NO; }
-    typedef void (*Unbinder)(void *device, void *self, NSError **error)
-                 __attribute__((swiftcall))
-                 __attribute__((swift_context));
-
-    ((Unbinder)address)(device, core, error);
+    void (*unbinder)(void *, void *, NSError **) __attribute__((swiftcall)) __attribute__((swift_context)) __attribute__((swift_error(not_nil))) = (void(*)(void *, void *, NSError **))address;
+    unbinder(device, core, error);
     return *error == nil;
 }
+#pragma clang diagnostic pop
 
 // sendMessage(_ message: RNMessage) throws
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswift_error_attribute"
 BOOL RayneoBridgeSendMessage(void *core, void *message, NSError **error) {
     void *address = dlsym(RTLD_DEFAULT, "$s9RayneoNet13RNCoreConnectC4send7messageyAA9RNMessageC_tKF");
     if (!address) { return NO; }
-    typedef void (*Sender)(void *message, void *self, NSError **error)
-                 __attribute__((swiftcall))
-                 __attribute__((swift_context));
-
-    ((Sender)address)(message, core, error);
+    void (*sender)(void *, void *, NSError **) __attribute__((swiftcall)) __attribute__((swift_context)) __attribute__((swift_error(not_nil))) = (void(*)(void *, void *, NSError **))address;
+    sender(message, core, error);
     return *error == nil;
 }
+#pragma clang diagnostic pop
 
 // setAccountID(_ value: String)
 void RayneoBridgeSetAccountID(void *core, RayneoSwiftString accountID) {
