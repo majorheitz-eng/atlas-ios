@@ -136,7 +136,7 @@ BOOL RayneoBridgeDiscover(void *core, NSError **error) {
     typedef void (*Discoverer)(RayneoSwiftArray filters, RayneoSwiftArray retrieveIDs,
                                 void *self, NSError **error)
                  __attribute__((swiftcall))
-                 __attribute__((swift_context))
+                 __attribute__((swift_context));
 
     RayneoSwiftArray nilArray = {NULL, 0, 0};
     ((Discoverer)address)(nilArray, nilArray, core, error);
@@ -152,7 +152,7 @@ BOOL RayneoBridgeConnectBLE(void *core, void *device,
     typedef void (*Connector)(void *device, RayneoSwiftString userID, uint8_t type,
                               void *self, NSError **error)
                  __attribute__((swiftcall))
-                 __attribute__((swift_context))
+                 __attribute__((swift_context));
 
     ((Connector)address)(device, userID, type, core, error);
     return *error == nil;
@@ -164,7 +164,7 @@ BOOL RayneoBridgeUnbind(void *core, void *device, NSError **error) {
     if (!address) { return NO; }
     typedef void (*Unbinder)(void *device, void *self, NSError **error)
                  __attribute__((swiftcall))
-                 __attribute__((swift_context))
+                 __attribute__((swift_context));
 
     ((Unbinder)address)(device, core, error);
     return *error == nil;
@@ -176,7 +176,7 @@ BOOL RayneoBridgeSendMessage(void *core, void *message, NSError **error) {
     if (!address) { return NO; }
     typedef void (*Sender)(void *message, void *self, NSError **error)
                  __attribute__((swiftcall))
-                 __attribute__((swift_context))
+                 __attribute__((swift_context));
 
     ((Sender)address)(message, core, error);
     return *error == nil;
