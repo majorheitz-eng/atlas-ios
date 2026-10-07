@@ -11,8 +11,8 @@ Pod::Spec.new do |s|
   s.swift_version  = '5.0'
 
   # Main module source (Expo module Swift + ObjC bridging header/source)
-  s.source_files   = "ios/*.{h,m,swift}", "ios/ABI/ProbeBridge.h", "ios/ABI/ProbeBridge.m"
-  # All other ABI Swift files contain @_silgen_name declarations that cause
+  s.source_files   = "ios/*.{h,m,swift}", "ios/ABI/*.{h,m}"
+  # All ABI Swift files contain @_silgen_name declarations that cause
   # linker errors — RayneoNet.framework has no .swiftmodule so Swift-mangled
   # symbols can't resolve at link time. RayNeoModule.swift uses plain
   # CoreBluetooth instead. RayneoNet.swift is used only for swiftmodule emission.
