@@ -21,10 +21,13 @@
         "NSBluetoothAlwaysUsageDescription": "Atlas uses Bluetooth to connect to your RayNeo iO glasses and display responses on the HUD.",
         "NSBluetoothPeripheralUsageDescription": "Atlas uses Bluetooth to connect to your RayNeo iO glasses.",
         "UISupportedExternalAccessoryProtocols": [
-          "com.rayneo.venus.pub"
+          "com.rayneo.venus.dev",
+          "com.rayneo.venus.pub",
+          "cn.rayneo.mercury"
         ],
         "UIBackgroundModes": [
-          "bluetooth-central"
+          "bluetooth-central",
+          "external-accessory"
         ],
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
