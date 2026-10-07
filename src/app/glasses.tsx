@@ -90,6 +90,21 @@ export default function GlassesScreen() {
     prevStatusRef.current = rayneo.status;
   }, [rayneo.status, pushLog]);
 
+  // Listen for native module errors and log them so the user can see what's failing
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('../lib/rayneo/connection');
+    try {
+      const rayneoMod = require('../../../modules/rayneo/src/RayNeoModule');
+      if (rayneoMod && typeof rayneoMod.onError === 'function') {
+        const unsub = rayneoMod.onError((event: { kind: string; message: string }) => {
+          pushLog(`SDK ${event.kind}: ${event.message}`);
+        });
+        return unsub;
+      }
+    } catch { /* module not available */ }
+  }, [pushLog]);
+
   const handleScan = useCallback(async () => {
     if (rayneo.status === 'scanning') {
       pushLog('stopping scan');

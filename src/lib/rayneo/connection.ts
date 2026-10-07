@@ -160,6 +160,36 @@ export function useRayNeo(): UseRayNeo {
     return unsubscribe;
   }, [native]);
 
+  // Subscribe to connectionState and error events from the native module.
+  // Without this, SDK load failures and connection events are invisible.
+  useEffect(() => {
+    if (!native) return;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('../../../modules/rayneo/src/RayNeoModule');
+    if (!mod) return;
+
+    let unsubConn: (() => void) | undefined;
+    let unsubErr: (() => void) | undefined;
+
+    if (typeof mod.onConnectionState === 'function') {
+      unsubConn = mod.onConnectionState((event: { state: string; [key: string]: unknown }) => {
+        const s = event.state;
+        if (s === 'connected' || s === 'authenticated') setStatus('connected');
+        else if (s === 'connecting' || s === 'reconnecting') setStatus('connecting');
+        else if (s === 'disconnected' || s === 'linkLost') setStatus('disconnected');
+        else if (s === 'sdkLoaded') { /* SDK loaded, keep current status */ }
+      });
+    }
+
+    if (typeof mod.onError === 'function') {
+      unsubErr = mod.onError((event: { kind: string; message: string }) => {
+        console.warn('[RayNeo]', event.kind, event.message);
+      });
+    }
+
+    return () => { unsubConn?.(); unsubErr?.(); };
+  }, [native]);
+
   // Subscribe to settings/status events from the native module. Each inbound
   // business 15 frame that the Swift parser can decode fires a "settings"
   // event with whatever fields the glasses reported. We merge into React
