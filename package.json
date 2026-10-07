@@ -58,7 +58,7 @@
     "test": "jest --runInBand",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "eas-build-post-install": "exit 0"
+    "eas-build-post-install": "bash ./scripts/eas-build-pre-install.sh"
   },
   "jest": {
     "preset": "jest-expo"

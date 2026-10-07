@@ -1,4 +1,5 @@
 import Foundation
+import RayneoNet
 
 extension CoreHandle {
     @_silgen_name("$s9RayneoNet13RNCoreConnectC3add15messageDelegateyAA09RNMessageG0_p_tF")

@@ -10,17 +10,26 @@ Pod::Spec.new do |s|
   s.platforms      = { :ios => '16.0' }
   s.swift_version  = '5.0'
 
-  # Main module source — Expo module Swift + ObjC dlsym bridge files.
-  # RayneoBridge.h/.m and RayneoBridge.swift replace the @_silgen_name ABI files,
-  # using dlsym to call RayneoNet.framework functions at runtime without a swiftmodule.
-  # ProbeBridge.h/.m provide the framework image verification (UUID check via dladdr).
+  # Turbo-IO architecture: @_silgen_name + RecoveredInterface swiftmodule.
+  # CoreABI/MessageABI/CoreMessageReceiver use @_silgen_name to call RayneoNet.framework.
+  # RayneoNet.swift is NOT compiled here — it's compiled to a swiftmodule by the
+  # pre-install script (eas-build-post-install) so `import RayneoNet` resolves.
+  # ProbeBridge.h/.m handles dlsym for image verification, ad parsing, SDK singleton.
   s.source_files   = "ios/RayNeoModule.swift",
-                     "ios/ABI/RayneoBridge.h", "ios/ABI/RayneoBridge.m",
-                     "ios/ABI/RayneoBridge.swift",
+                     "ios/ABI/CoreABI.swift",
+                     "ios/ABI/MessageABI.swift",
+                     "ios/ABI/CoreMessageReceiver.swift",
+                     "ios/ABI/DeviceBusinessWire.swift",
+                     "ios/ABI/BusinessEnvelopeMetadata.swift",
+                     "ios/ABI/AssistantTextPrototype.swift",
+                     "ios/ABI/ProtocolError.swift",
+                     "ios/ABI/TLV.swift",
+                     "ios/ABI/CRC16XMODEM.swift",
+                     "ios/ABI/LauncherStructure.swift",
                      "ios/ABI/ProbeBridge.h", "ios/ABI/ProbeBridge.m"
-  # Old ABI Swift files with @_silgen_name are excluded from compilation (they
-  # require a .swiftmodule that doesn't exist). Kept for reference only.
-  s.preserve_paths = "ios/ABI/**/*"
+  # RayneoNet.swift is declaration-only, compiled to swiftmodule by pre-install script
+  s.exclude_files  = "ios/ABI/RayneoNet.swift"
+  s.preserve_paths = "ios/ABI/RayneoNet.swift", "ios/ABI/build/**/*"
 
   s.vendored_frameworks = [
     'ios/Frameworks/RayneoNet.framework',
@@ -36,6 +45,7 @@ Pod::Spec.new do |s|
 
   # Add the declaration-only swiftmodule path so `import RayneoNet` resolves
   s.pod_target_xcconfig = {
+    'SWIFT_INCLUDE_PATHS' => '$(inherited) $(PODS_ROOT)/RayNeo/ios/ABI/build',
     'LD_RUNPATH_SEARCH_PATHS' => '$(inherited) @executable_path/Frameworks'
   }
 

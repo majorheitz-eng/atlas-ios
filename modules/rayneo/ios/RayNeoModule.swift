@@ -1,155 +1,11 @@
 import CoreBluetooth
 import ExpoModulesCore
-import ExternalAccessory
+import Foundation
 
-// MARK: - RayNeo iO profile
+// MARK: - RayNeo iO BLE profile
 
 private enum RayNeoIOProfile {
   static let service = CBUUID(string: "B81D")
-  static let serviceFull = CBUUID(string: "0000B81D-0000-1000-8000-00805F9B34FB")
-  static let outbound = CBUUID(string: "EA8B70D5-2BD3-49AB-9C31-9C38B2C3C4F9")
-  static let inbound = CBUUID(string: "7DB3E235-3608-41F3-A03C-955FCBD2EA4B")
-  static let accessoryProtocol = "com.rayneo.venus.pub"
-}
-
-// MARK: - Business envelope encoder
-
-private enum BusinessEnvelope {
-  static func encode(type: UInt8, body: Data, sequence: UInt32 = 0) -> Data {
-    var out = Data([8, 1, 16, type, 26])
-    appendVarint(UInt64(body.count), to: &out)
-    out.append(body)
-    if sequence != 0 {
-      out.append(40)
-      appendVarint(UInt64(sequence), to: &out)
-    }
-    return out
-  }
-
-  private static func appendVarint(_ value: UInt64, to out: inout Data) {
-    var v = value
-    repeat {
-      let b = UInt8(v & 0x7F)
-      v >>= 7
-      out.append(v > 0 ? (b | 0x80) : b)
-    } while v > 0
-  }
-}
-
-// MARK: - Assistant payload encoders
-
-private enum AssistantEncoders {
-  static func asrText(_ text: String, isFinal: Bool) throws -> Data {
-    guard text.utf8.count <= 1024 else { throw RayNeoError.textTooLong }
-    let body = try encodeJSONSorted(["text": text, "final": isFinal] as [String: Any])
-    var packet = Data([8, 1, 16, 5, 26])
-    appendVarint(UInt64(body.count), to: &packet)
-    packet.append(body)
-    return packet
-  }
-
-  static func chatAnswer(
-    text: String, isFinal: Bool, roundID: String,
-    query: String, timestampMs: Int64
-  ) throws -> Data {
-    guard (!text.isEmpty || isFinal),
-          text.utf8.count <= 512,
-          query.utf8.count <= 512,
-          timestampMs >= 0
-    else { throw RayNeoError.invalidInput }
-    let body: [String: Any] = [
-      "sub": "workflow", "vendor": "deepseek",
-      "uuid": roundID, "sid": roundID,
-      "round": -1, "timestamp": timestampMs,
-      "query": query, "domain": "chat", "intent": "chat",
-      "payload": [String: String](), "offline": false,
-      "answer": ["text": text, "isFinal": isFinal] as [String: Any],
-    ]
-    let bodyData = try encodeJSONSorted(body)
-    guard bodyData.count <= 8192 else { throw RayNeoError.invalidInput }
-    var packet = Data([8, 1, 16, 32, 26])
-    appendVarint(UInt64(bodyData.count), to: &packet)
-    packet.append(bodyData)
-    return packet
-  }
-
-  static func responseComplete() -> Data {
-    Data([8, 1, 16, 12, 26, 2, 123, 125, 34, 0])
-  }
-
-  static func teleprompter(type: UInt8, body: [String: Any]) throws -> Data {
-    var json = body
-    json["action"] = 1
-    let bodyData = try encodeJSONSorted(json)
-    return BusinessEnvelope.encode(type: type, body: bodyData)
-  }
-
-  static func notification(type: UInt8, body: [String: Any]) throws -> Data {
-    let bodyData = try encodeJSONSorted(body)
-    return BusinessEnvelope.encode(type: type, body: bodyData)
-  }
-
-  /// Speedometer / navigation speed display (business 15, type 2 "cmd" format).
-  /// Uses the same launcher/settings envelope as brightness_change.
-  static func speedometer(speed: Int, unit: String = "km/h") throws -> Data {
-    let inner: [String: Any] = ["speed": speed, "unit": unit]
-    let innerData = try encodeJSONSorted(inner)
-    let innerString = String(data: innerData, encoding: .utf8) ?? ""
-    let body: [String: Any] = [
-      "cmd": "speedometer_update",
-      "payload": ["value": 0, "mode": 0, "data": innerString] as [String: Any],
-    ]
-    let bodyData = try encodeJSONSorted(body)
-    return BusinessEnvelope.encode(type: 2, body: bodyData)
-  }
-
-  /// Lyrics display (business 20, teleprompter type 2 "prepare").
-  /// Reuses the teleprompter envelope with lyric-specific fields.
-  static func lyrics(did: String, text: String, speed: Int) throws -> Data {
-    let utf8 = Data(text.utf8)
-    var body: [String: Any] = [
-      "did": did, "action": 1,
-      "total": utf8.count,
-      "scroll": 2, "speed": speed,
-      "pageOffset": 0, "highLightOffset": 0,
-    ]
-    body["checksum"] = Self.teleprompterChecksum(utf8)
-    return try teleprompter(type: 2, body: body)
-  }
-
-  static func encodeSettingsJSON(_ value: [String: Any]) throws -> Data {
-    return try JSONSerialization.data(
-      withJSONObject: value,
-      options: [.sortedKeys, .withoutEscapingSlashes, .fragmentsAllowed]
-    )
-  }
-
-  private static func encodeJSONSorted(_ value: [String: Any]) throws -> Data {
-    return try JSONSerialization.data(
-      withJSONObject: value,
-      options: [.sortedKeys, .withoutEscapingSlashes, .fragmentsAllowed]
-    )
-  }
-
-  private static func appendVarint(_ value: UInt64, to out: inout Data) {
-    var v = value
-    repeat {
-      let b = UInt8(v & 0x7F)
-      v >>= 7
-      out.append(v > 0 ? (b | 0x80) : b)
-    } while v > 0
-  }
-
-  static func teleprompterChecksum(_ bytes: Data) -> String {
-    var hash: UInt32 = 2_166_136_261
-    for byte in bytes {
-      hash ^= UInt32(byte)
-      hash = hash &* 16_777_619
-    }
-    let hex = String(hash, radix: 16, uppercase: false)
-    if hex.count >= 8 { return hex }
-    return String(repeating: "0", count: 8 - hex.count) + hex
-  }
 }
 
 // MARK: - Errors
@@ -182,9 +38,9 @@ enum RayNeoError: Error, LocalizedError {
   }
 }
 
-// MARK: - BLE Delegate (fallback scan only)
+// MARK: - BLE Delegate
 
-private final class RayNeoDelegate: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
+private final class RayNeoBLEDelegate: NSObject, CBCentralManagerDelegate {
   weak var owner: RayNeoModule?
 
   func centralManagerDidUpdateState(_ central: CBCentralManager) {
@@ -197,28 +53,29 @@ private final class RayNeoDelegate: NSObject, CBCentralManagerDelegate, CBPeriph
     advertisementData: [String: Any],
     rssi RSSI: NSNumber
   ) {
-    owner?.handleDiscovered(peripheral)
+    owner?.handleDiscovered(peripheral, advertisementData: advertisementData, rssi: RSSI)
   }
 }
 
 // MARK: - Module
 
 public class RayNeoModule: Module {
-  private let delegate = RayNeoDelegate()
+  private let bleDelegate = RayNeoBLEDelegate()
   private var central: CBCentralManager?
 
-  // SDK framework handles (via dlsym bridge)
+  // SDK handle from coreShared() — opaque RNCoreConnect singleton
   private var core: CoreHandle?
+  private var messageReceiver: CoreMessageReceiver?
+  private var modelCatalog: [String: Any]?
 
-  // Cached discovered peripherals (for BLE fallback + SDK conversion)
+  // Discovered BLE peripherals (by UUID) for scan/connect
   private var discoveredPeripherals: [UUID: CBPeripheral] = [:]
+  // SDK-parsed peripheral objects (RNPeripheral NSObject by UUID) for connect
+  private var sdkPeripherals: [UUID: NSObject] = [:]
+  private var parsedAdvertisements = Set<UUID>()
 
-  // EASession transport (MFi fallback if SDK is unavailable)
-  private var eaSession: EASession?
-  private var eaInput: InputStream?
-  private var eaOutput: OutputStream?
-  private var eaAccessory: EAAccessory?
-  private var eaConnected = false
+  // Notification master switch (business 21, type 18) — sent once per session
+  private var notificationMasterEnabled = false
 
   // Notification mirroring
   private var notificationMirrorEnabled = false
@@ -245,7 +102,6 @@ public class RayNeoModule: Module {
 
     AsyncFunction("getScanStatus") { () -> String in
       if self.isAuthenticated { return "authenticated" }
-      if self.eaConnected { return "connected" }
       if self.central?.isScanning == true { return "scanning" }
       if self.central?.state == .poweredOn { return "idle" }
       return "disconnected"
@@ -268,18 +124,32 @@ public class RayNeoModule: Module {
     }
 
     AsyncFunction("sendText") { (text: String, isFinal: Bool) -> Void in
-      try self.sendBusiness(.voiceAssistant, payload: try AssistantEncoders.asrText(text, isFinal: isFinal))
+      let payload = try AssistantTextPrototype.asrText(text, isFinal: isFinal)
+      try self.sendBusiness(.voiceAssistant, payload: payload)
     }
 
     AsyncFunction("sendAnswer") {
       (text: String, isFinal: Bool, roundID: String, query: String, timestampMs: Int64) -> Void in
-      let payload = try AssistantEncoders.chatAnswer(
-        text: text, isFinal: isFinal, roundID: roundID, query: query, timestampMs: timestampMs)
+      guard (!text.isEmpty || isFinal),
+            text.utf8.count <= 512,
+            query.utf8.count <= 512,
+            timestampMs >= 0
+      else { throw RayNeoError.invalidInput }
+      let body: [String: Any] = [
+        "sub": "workflow", "vendor": "deepseek",
+        "uuid": roundID, "sid": roundID,
+        "round": -1, "timestamp": timestampMs,
+        "query": query, "domain": "chat", "intent": "chat",
+        "payload": [String: String](), "offline": false,
+        "answer": ["text": text, "isFinal": isFinal] as [String: Any],
+      ]
+      let payload = try DeviceBusinessWire.encode(type: 32, json: body)
       try self.sendBusiness(.voiceAssistant, payload: payload)
     }
 
     AsyncFunction("sendResponseComplete") { () -> Void in
-      try self.sendBusiness(.voiceAssistant, payload: AssistantEncoders.responseComplete())
+      let payload = try DeviceBusinessWire.encode(type: 12, json: [:])
+      try self.sendBusiness(.voiceAssistant, payload: payload)
     }
 
     AsyncFunction("sendTeleprompterText") {
@@ -291,25 +161,41 @@ public class RayNeoModule: Module {
         "scroll": 2, "speed": speed,
         "pageOffset": 0, "highLightOffset": 0,
       ]
-      body["checksum"] = AssistantEncoders.teleprompterChecksum(utf8)
-      let payload = try AssistantEncoders.teleprompter(type: 2, body: body)
+      body["checksum"] = Self.teleprompterChecksum(utf8)
+      let payload = try DeviceBusinessWire.encode(type: 2, json: body)
       try self.sendBusiness(.teleprompter, payload: payload)
     }
 
     AsyncFunction("sendLyrics") {
       (did: String, text: String, speed: Int) -> Void in
-      let payload = try AssistantEncoders.lyrics(did: did, text: text, speed: speed)
+      let utf8 = Data(text.utf8)
+      var body: [String: Any] = [
+        "did": did, "action": 1,
+        "total": utf8.count,
+        "scroll": 2, "speed": speed,
+        "pageOffset": 0, "highLightOffset": 0,
+      ]
+      body["checksum"] = Self.teleprompterChecksum(utf8)
+      let payload = try DeviceBusinessWire.encode(type: 2, json: body)
       try self.sendBusiness(.teleprompter, payload: payload)
     }
 
     AsyncFunction("sendSpeedometer") {
       (speed: Int, unit: String?) -> Void in
-      let payload = try AssistantEncoders.speedometer(speed: speed, unit: unit ?? "km/h")
+      let inner: [String: Any] = ["speed": speed, "unit": unit ?? "km/h"]
+      let innerData = try JSONSerialization.data(withJSONObject: inner, options: [.sortedKeys])
+      let innerString = String(data: innerData, encoding: .utf8) ?? ""
+      let body: [String: Any] = [
+        "cmd": "speedometer_update",
+        "payload": ["value": 0, "mode": 0, "data": innerString] as [String: Any],
+      ]
+      let payload = try DeviceBusinessWire.encode(type: 2, json: body)
       try self.sendBusiness(.launcher, payload: payload)
     }
 
     AsyncFunction("sendNotification") {
       (title: String, content: String, appName: String?, timestamp: String?) -> Void in
+      try self.ensureNotificationMasterSwitch()
       let uid = String(Int.random(in: 1...2_147_483_646))
       let ts = timestamp ?? Self.currentISO8601()
       let body: [String: Any] = [
@@ -320,7 +206,7 @@ public class RayNeoModule: Module {
         "content": content, "timestamp": ts,
         "category": 0, "reply": false, "type": 1,
       ]
-      let payload = try AssistantEncoders.notification(type: 2, body: body)
+      let payload = try DeviceBusinessWire.encode(type: 2, json: body)
       try self.sendBusiness(.notification, payload: payload)
     }
 
@@ -330,24 +216,22 @@ public class RayNeoModule: Module {
         "cmd": "brightness_change",
         "payload": ["value": value, "mode": 0, "data": ""] as [String: Any],
       ]
-      let bodyData = try AssistantEncoders.encodeSettingsJSON(body)
-      let envelope = BusinessEnvelope.encode(type: 2, body: bodyData)
-      try self.sendBusiness(.launcher, payload: envelope)
+      let payload = try DeviceBusinessWire.encode(type: 2, json: body)
+      try self.sendBusiness(.launcher, payload: payload)
     }
 
     AsyncFunction("setDisplay") { (height: Int, distance: Int) -> Void in
       guard [1, 3, 5].contains(height) else { throw RayNeoError.invalidInput }
       guard distance == 1 || distance == 2 else { throw RayNeoError.invalidInput }
       let inner: [String: Any] = ["height": height, "distance": distance]
-      let innerData = try AssistantEncoders.encodeSettingsJSON(inner)
+      let innerData = try JSONSerialization.data(withJSONObject: inner, options: [.sortedKeys])
       let innerString = String(data: innerData, encoding: .utf8) ?? ""
       let body: [String: Any] = [
         "cmd": "display_config",
         "payload": ["value": 0, "mode": 0, "data": innerString] as [String: Any],
       ]
-      let bodyData = try AssistantEncoders.encodeSettingsJSON(body)
-      let envelope = BusinessEnvelope.encode(type: 5, body: bodyData)
-      try self.sendBusiness(.launcher, payload: envelope)
+      let payload = try DeviceBusinessWire.encode(type: 5, json: body)
+      try self.sendBusiness(.launcher, payload: payload)
     }
 
     AsyncFunction("refreshSettings") { () -> Void in
@@ -355,15 +239,15 @@ public class RayNeoModule: Module {
         "cmd": "request_general_status",
         "payload": ["value": 0, "mode": 0, "data": ""] as [String: Any],
       ]
-      let statusData = try AssistantEncoders.encodeSettingsJSON(statusBody)
-      try self.sendBusiness(.launcher, payload: BusinessEnvelope.encode(type: 1, body: statusData))
+      let statusPayload = try DeviceBusinessWire.encode(type: 1, json: statusBody)
+      try self.sendBusiness(.launcher, payload: statusPayload)
 
       let settingsBody: [String: Any] = [
         "cmd": "request_general_settings",
         "payload": ["value": 0, "mode": 0, "data": ""] as [String: Any],
       ]
-      let settingsData = try AssistantEncoders.encodeSettingsJSON(settingsBody)
-      try self.sendBusiness(.launcher, payload: BusinessEnvelope.encode(type: 4, body: settingsData))
+      let settingsPayload = try DeviceBusinessWire.encode(type: 4, json: settingsBody)
+      try self.sendBusiness(.launcher, payload: settingsPayload)
     }
 
     AsyncFunction("startNotificationMirror") { () -> Void in
@@ -379,7 +263,7 @@ public class RayNeoModule: Module {
     }
 
     AsyncFunction("getSDKVersion") { () -> String in
-      return self.core?.sdkVersion ?? "not loaded"
+      return coreVersion() ?? "not loaded"
     }
 
     AsyncFunction("getDeviceState") { () -> [String: Any] in
@@ -391,21 +275,105 @@ public class RayNeoModule: Module {
     }
   }
 
-  // MARK: - Core loading (dlsym bridge)
+  // MARK: - Core loading (Turbo-IO architecture)
 
   private func loadCore() {
-    guard RayneoBridgeImageMatches() else {
+    // Verify the RayneoNet framework image matches the expected v1.2.35 UUID
+    guard RNProbeMessageImageMatches() else {
       sendEvent("error", ["kind": "sdk", "message": "RayneoNet framework version mismatch"])
       return
     }
     if core == nil {
-      core = CoreHandle.shared()
+      // coreShared() calls the real RNCoreConnect.shared() via @_silgen_name
+      core = coreShared()
       if let core = core {
-        sendEvent("connectionState", ["state": "sdkLoaded", "version": core.sdkVersion ?? "unknown"])
+        sendEvent("connectionState", ["state": "sdkLoaded", "version": coreVersion() ?? "unknown"])
+        if modelCatalog == nil { modelCatalog = sdkModelCatalog() }
+        setupMessageReceiver()
         startConnectionPolling()
       } else {
         sendEvent("error", ["kind": "sdk", "message": "Failed to get RNCoreConnect.shared()"])
       }
+    }
+  }
+
+  // MARK: - Message receiver (Turbo-IO CoreMessageReceiver)
+
+  private func setupMessageReceiver() {
+    guard let core = core, messageReceiver == nil else { return }
+    let receiver = CoreMessageReceiver()
+    receiver.onBusinessEnvelope = { [weak self] _, business, payload in
+      guard let self else { return }
+      self.sendEvent("messageReceived", [
+        "data": payload.base64EncodedString(),
+        "business": Int(business),
+      ])
+      if business == 15 {
+        self.parseSettingsEvent(payload: payload)
+      }
+    }
+    receiver.onVoiceEnvelope = { [weak self] _, metadata, audio, _ in
+      guard let self else { return }
+      let data = audio ?? Data()
+      self.sendEvent("messageReceived", [
+        "data": data.base64EncodedString(),
+        "business": 13,
+        "type": Int(metadata.messageType ?? 0),
+      ])
+    }
+    receiver.onBusinessLoss = { [weak self] in
+      self?.sendEvent("error", ["kind": "businessLoss", "message": "Business receive queue overflow"])
+    }
+    messageReceiver = receiver
+    // Register our native delegate with the SDK's RNCoreConnect singleton
+    core.addMessageDelegate(receiver)
+  }
+
+  // MARK: - Settings event parsing (business 15)
+
+  private func parseSettingsEvent(payload: Data) {
+    do {
+      let wire = try DeviceBusinessWire(payload)
+      var event: [String: Any] = ["type": Int(wire.type)]
+      if let cmd = wire.json["cmd"] as? String { event["cmd"] = cmd }
+
+      // Type 1: generalStatus — battery + brightness
+      if wire.type == 1 {
+        let status = wire.json["generalStatus"] as? [String: Any] ?? wire.json
+        if let battery = DeviceBusinessWire.integer(status, "battery") {
+          event["battery"] = Int(battery)
+        }
+        if let brightness = DeviceBusinessWire.integer(status, "brightness") {
+          event["brightness"] = Int(brightness)
+        }
+      }
+
+      // Type 4: generalSettings — display config
+      if wire.type == 4 {
+        let settings = wire.json["generalSettings"] as? [String: Any] ?? wire.json
+        if let config = settings["displayConfig"] as? [String: Any]
+          ?? settings["display_config"] as? [String: Any] {
+          if let height = DeviceBusinessWire.integer(config, "height") {
+            event["displayHeight"] = Int(height)
+          }
+          if let distance = DeviceBusinessWire.integer(config, "distance") {
+            event["displayDistance"] = Int(distance)
+          }
+        }
+      }
+
+      // Type 3/6/17/19: cmd response — extract brightness_change value
+      if [3, 6, 17, 19].contains(wire.type),
+         let p = wire.json["payload"] as? [String: Any],
+         let value = DeviceBusinessWire.integer(p, "value"),
+         let cmd = wire.json["cmd"] as? String,
+         cmd == "brightness_change" {
+        event["brightness"] = Int(value)
+      }
+
+      sendEvent("settings", event)
+    } catch {
+      // Not a parseable business envelope — skip
     }
   }
 
@@ -422,49 +390,50 @@ public class RayNeoModule: Module {
 
   private func pollConnectionState() {
     guard let core = core else { return }
-    let linked = core.linkedDevices
+    guard let linked = core.linkedDevices() else { return }
     if linked.count == 1, let device = linked.first {
-      let connected = device.isConnected
-      let bleState = device.bleStateByte
+      let connected = device.isConnected()
+      let bleState = device.bleStateByte()
       if connected && bleState == 9 {
         sendEvent("connectionState", [
           "state": "authenticated",
-          "deviceID": device.deviceID,
-          "name": device.name,
-          "bleState": Int(bleState)
+          "deviceID": device.deviceID(),
+          "name": device.name(),
+          "bleState": Int(bleState),
         ])
       } else if connected {
+        // Connected but not yet authenticated — reset notification switch
+        notificationMasterEnabled = false
         sendEvent("connectionState", [
           "state": "connected",
-          "deviceID": device.deviceID,
-          "bleState": Int(bleState)
+          "deviceID": device.deviceID(),
+          "bleState": Int(bleState),
         ])
+      } else {
+        notificationMasterEnabled = false
       }
-    } else if linked.count == 0 && core.bondedDeviceCount > 0 {
-      sendEvent("connectionState", ["state": "bonded", "bondedCount": core.bondedDeviceCount])
+    } else if linked.count == 0 {
+      notificationMasterEnabled = false
+      let bondedCount = core.bondedDevices()?.count ?? 0
+      if bondedCount > 0 {
+        sendEvent("connectionState", ["state": "bonded", "bondedCount": bondedCount])
+      }
     }
   }
 
   private var isAuthenticated: Bool {
     guard let core = core else { return false }
-    let linked = core.linkedDevices
-    return linked.count == 1 && linked[0].isConnected && linked[0].bleStateByte == 9
-  }
-
-  private var authenticatedDeviceID: String? {
-    guard let core = core else { return nil }
-    let linked = core.linkedDevices
-    guard linked.count == 1, linked[0].isConnected, linked[0].bleStateByte == 9 else { return nil }
-    return linked[0].deviceID
+    guard let linked = core.linkedDevices() else { return false }
+    return linked.count == 1 && linked[0].isConnected() && linked[0].bleStateByte() == 9
   }
 
   // MARK: - Central lifecycle
 
   private func ensureCentral() {
     if central == nil {
-      delegate.owner = self
+      bleDelegate.owner = self
       central = CBCentralManager(
-        delegate: delegate,
+        delegate: bleDelegate,
         queue: .main,
         options: [CBCentralManagerOptionShowPowerAlertKey: false]
       )
@@ -479,41 +448,33 @@ public class RayNeoModule: Module {
 
     // 1. Check SDK bonded/linked devices first (primary path)
     if let core = core {
-      let bonded = core.bondedDevices
-      for device in bonded {
-        sendEvent("scanResult", [
-          "id": "sdk-\(device.deviceID)",
-          "name": device.name,
-          "rssi": 0,
-          "bonded": true,
-          "connected": device.isConnected,
-          "bleState": Int(device.bleStateByte),
-        ])
+      if let bonded = core.bondedDevices() {
+        for device in bonded {
+          sendEvent("scanResult", [
+            "id": "sdk-\(device.deviceID())",
+            "name": device.name(),
+            "rssi": 0,
+            "bonded": true,
+            "connected": device.isConnected(),
+            "bleState": Int(device.bleStateByte()),
+          ])
+        }
       }
-      let linked = core.linkedDevices
-      for device in linked {
-        sendEvent("scanResult", [
-          "id": "sdk-\(device.deviceID)",
-          "name": device.name,
-          "rssi": 0,
-          "linked": true,
-          "connected": device.isConnected,
-          "bleState": Int(device.bleStateByte),
-        ])
+      if let linked = core.linkedDevices() {
+        for device in linked {
+          sendEvent("scanResult", [
+            "id": "sdk-\(device.deviceID())",
+            "name": device.name(),
+            "rssi": 0,
+            "linked": true,
+            "connected": device.isConnected(),
+            "bleState": Int(device.bleStateByte()),
+          ])
+        }
       }
     }
 
-    // 2. Check EAAccessoryManager for MFi-connected glasses
-    let eaAccessories = EAAccessoryManager.shared().connectedAccessories
-    for accessory in eaAccessories where accessory.protocolStrings.contains(RayNeoIOProfile.accessoryProtocol) {
-      sendEvent("scanResult", [
-        "id": "ea-\(accessory.connectionID)",
-        "name": accessory.name,
-        "rssi": 0,
-      ])
-    }
-
-    // 3. Also scan via BLE as fallback
+    // 2. Also scan via BLE for new/unbonded devices
     guard let central, central.state == .poweredOn else {
       return ["scanning": false, "sdkLoaded": core != nil]
     }
@@ -541,9 +502,11 @@ public class RayNeoModule: Module {
     return ["scanning": true, "sdkLoaded": core != nil]
   }
 
-  // MARK: Connect
+  // MARK: - Connect
 
   private func connect(to identifier: String) throws {
+    guard let core = core else { throw RayNeoError.sdkNotLoaded }
+
     // SDK path: "sdk-<deviceID>"
     if identifier.hasPrefix("sdk-") {
       let deviceID = String(identifier.dropFirst(4))
@@ -551,32 +514,35 @@ public class RayNeoModule: Module {
       return
     }
 
-    // EA path: "ea-<connectionID>"
-    if identifier.hasPrefix("ea-") {
-      try connectEA(identifier: identifier)
+    // BLE path: UUID string from scanResult
+    let uuid = UUID(uuidString: identifier) ?? UUID()
+
+    // Try findDevice by UUID string (SDK cache — compares CBPeripheral.identifier.uuidString)
+    if let device = core.findDevice(identifier) {
+      try core.connectBLE(device)
+      sendEvent("connectionState", ["state": "connecting", "id": identifier])
       return
     }
 
-    // BLE fallback: UUID
-    guard let central, central.state == .poweredOn else {
-      throw RayNeoError.bluetoothUnavailable
+    // Try converting a stored SDK peripheral object (from scan)
+    if let sdkPeripheral = sdkPeripherals[uuid] {
+      if let device = convertPeripheral(sdkPeripheral) {
+        try core.connectBLE(device)
+        sendEvent("connectionState", ["state": "connecting", "id": identifier])
+        return
+      }
     }
-    let peripherals = central.retrievePeripherals(withIdentifiers: [UUID(uuidString: identifier) ?? UUID()])
-    guard let target = peripherals.first else {
-      throw RayNeoError.connectFailed("Peripheral \(identifier) not found")
-    }
-    discoveredPeripherals[target.identifier] = target
-    // For BLE, we need the SDK to convert and connect
-    if let core = core {
+
+    // Try getting SDK-owned CBPeripheral, then findDevice again
+    if RNProbeSDKPeripheral(uuid) != nil {
       if let device = core.findDevice(identifier) {
         try core.connectBLE(device)
         sendEvent("connectionState", ["state": "connecting", "id": identifier])
-      } else {
-        throw RayNeoError.connectFailed("SDK could not find device \(identifier)")
+        return
       }
-    } else {
-      throw RayNeoError.sdkNotLoaded
     }
+
+    throw RayNeoError.connectFailed("Device \(identifier) not found in SDK cache or scan results")
   }
 
   private func connectSDK(deviceID: String) throws {
@@ -590,143 +556,90 @@ public class RayNeoModule: Module {
     }
 
     // Try bonded devices
-    for device in core.bondedDevices where device.deviceID == deviceID {
-      try core.connectBLE(device)
-      sendEvent("connectionState", ["state": "connecting", "deviceID": deviceID])
-      return
+    if let bonded = core.bondedDevices() {
+      for device in bonded where device.deviceID() == deviceID {
+        try core.connectBLE(device)
+        sendEvent("connectionState", ["state": "connecting", "deviceID": deviceID])
+        return
+      }
     }
 
     throw RayNeoError.connectFailed("Device \(deviceID) not found in SDK cache or bonded list")
   }
 
-  private func connectEA(identifier: String) throws {
-    let parts = identifier.split(separator: "-", maxSplits: 1)
-    guard parts.count == 2 else {
-      throw RayNeoError.connectFailed("Invalid EA identifier: \(identifier)")
-    }
-    let connectionID = Int(parts[1]) ?? 0
-
-    let accessories = EAAccessoryManager.shared().connectedAccessories
-    guard let accessory = accessories.first(where: { $0.connectionID == connectionID }),
-          accessory.protocolStrings.contains(RayNeoIOProfile.accessoryProtocol) else {
-      throw RayNeoError.connectFailed("Glasses not found in connected accessories")
-    }
-
-    guard let session = EASession(accessory: accessory, forProtocol: RayNeoIOProfile.accessoryProtocol) else {
-      throw RayNeoError.connectFailed("Failed to create EASession")
-    }
-
-    eaSession = session
-    eaAccessory = accessory
-    eaInput = session.inputStream
-    eaOutput = session.outputStream
-
-    for stream in [eaInput as Stream?, eaOutput as Stream?].compactMap({ $0 }) {
-      stream.schedule(in: .main, forMode: .common)
-      stream.open()
-    }
-
-    eaConnected = true
-    sendEvent("connectionState", ["state": "connected", "id": identifier])
-  }
-
-  // MARK: Reconnect bonded
+  // MARK: - Reconnect bonded
 
   private func reconnectBonded() throws {
     guard let core = core else { throw RayNeoError.sdkNotLoaded }
-    let bonded = core.bondedDevices
+    guard let bonded = core.bondedDevices() else {
+      throw RayNeoError.connectFailed("No bonded devices")
+    }
     guard bonded.count == 1 else {
       throw RayNeoError.connectFailed("Expected exactly 1 bonded device, found \(bonded.count)")
     }
+    // connectBLE sends type 0 (BLE), empty userID — standard SDK auth path
     try core.connectBLE(bonded[0])
-    sendEvent("connectionState", ["state": "reconnecting", "deviceID": bonded[0].deviceID])
+    sendEvent("connectionState", ["state": "reconnecting", "deviceID": bonded[0].deviceID()])
   }
 
-  // MARK: Disconnect
+  // MARK: - Disconnect (no unbind — just emit state)
 
   private func disconnect() {
-    if let input = eaInput, let output = eaOutput {
-      input.close()
-      output.close()
-      input.remove(from: .main, forMode: .common)
-      output.remove(from: .main, forMode: .common)
-    }
-    eaSession = nil
-    eaInput = nil
-    eaOutput = nil
-    eaAccessory = nil
-    eaConnected = false
-
-    // SDK disconnect: unbind the linked device if authenticated
-    if let core = core, let device = core.linkedDevices.first {
-      try? core.unbind(device)
-    }
-
+    notificationMasterEnabled = false
     sendEvent("connectionState", ["state": "disconnected"])
   }
 
   // MARK: - Send (SDK authenticated path)
 
   private func sendBusiness(_ business: MessageBusinessIndex, payload: Data) throws {
-    // Primary: SDK authenticated path
-    if let core = core {
-      let linked = core.linkedDevices
-      guard linked.count >= 1 else { throw RayNeoError.noAuthenticatedDevice }
-      let device = linked[0]
-      guard device.isConnected, device.bleStateByte == 9 else {
-        throw RayNeoError.noAuthenticatedDevice
-      }
-      let message = try MessageFactory.make(
-        payload: payload, deviceID: device.deviceID,
-        business: business, messageID: UUID().uuidString
-      )
-      try core.sendMessage(message)
-      return
+    guard let core = core else { throw RayNeoError.sdkNotLoaded }
+    guard let linked = core.linkedDevices(), let device = linked.first else {
+      throw RayNeoError.noAuthenticatedDevice
     }
-
-    // Fallback: EASession raw write (no MFi auth, may not reach HUD)
-    if eaConnected, let output = eaOutput {
-      // Wrap in transport frame for EA path
-      let frame = TransportFrame(
-        messageNumber: 1, flags: 0,
-        wireBusinessID: business.rawValue, payload: payload
-      ).encoded()
-      let written = frame.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> Int in
-        guard let base = ptr.baseAddress else { return 0 }
-        return output.write(UnsafeRawPointer(base).assumingMemoryBound(to: UInt8.self), maxLength: frame.count)
-      }
-      if written < 0 {
-        throw RayNeoError.writeFailed("EASession output stream write failed")
-      }
-      return
+    // bleStateByte() == 9 means authSuccess
+    guard device.isConnected(), device.bleStateByte() == 9 else {
+      throw RayNeoError.noAuthenticatedDevice
     }
+    // MessageFactory.make verifies the framework image, creates RNMessage, sets msgID
+    let message = try MessageFactory.make(
+      payload: payload, deviceID: device.deviceID(),
+      business: business, messageID: UUID().uuidString
+    )
+    try core.sendMessage(message)
+  }
 
-    throw RayNeoError.sdkNotLoaded
+  // MARK: - Notification master switch (business 21, type 18)
+
+  private func ensureNotificationMasterSwitch() throws {
+    guard !notificationMasterEnabled else { return }
+    let payload = try DeviceBusinessWire.encode(type: 18, json: ["action": 1])
+    try sendBusiness(.notification, payload: payload)
+    notificationMasterEnabled = true
   }
 
   // MARK: - Device state query
 
   private func getDeviceState() -> [String: Any] {
     guard let core = core else { return ["loaded": false] }
-    let linked = core.linkedDevices
-    let bonded = core.bondedDevices
+    let bonded = core.bondedDevices() ?? []
+    let linked = core.linkedDevices() ?? []
     var result: [String: Any] = [
       "loaded": true,
-      "sdkVersion": core.sdkVersion ?? "unknown",
+      "sdkVersion": coreVersion() ?? "unknown",
       "bondedCount": bonded.count,
       "linkedCount": linked.count,
     ]
     if let device = linked.first {
-      result["deviceID"] = device.deviceID
-      result["name"] = device.name
-      result["connected"] = device.isConnected
-      result["bleState"] = Int(device.bleStateByte)
-      result["authenticated"] = device.isConnected && device.bleStateByte == 9
-      if let transport = device.transport {
-        result["transportState"] = Int(transport.transportState)
-        if let peripheral = transport.peripheral {
-          result["peripheralState"] = peripheral.state.rawValue
-        }
+      result["deviceID"] = device.deviceID()
+      result["name"] = device.name()
+      result["connected"] = device.isConnected()
+      result["bleState"] = Int(device.bleStateByte())
+      result["authenticated"] = device.isConnected() && device.bleStateByte() == 9
+      // transport() returns the real RNPeripheral NSObject from the SDK
+      let transport = device.transport()
+      result["transportState"] = Int(transport.rnSDKTransportState())
+      if let peripheral = transport.rnSDKPeripheral() {
+        result["peripheralState"] = peripheral.state.rawValue
       }
     }
     return result
@@ -762,6 +675,7 @@ public class RayNeoModule: Module {
   }
 
   private func sendNotificationToGlasses(title: String, content: String, appName: String?) throws {
+    try ensureNotificationMasterSwitch()
     let uid = String(Int.random(in: 1...2_147_483_646))
     let ts = Self.currentISO8601()
     let body: [String: Any] = [
@@ -772,7 +686,7 @@ public class RayNeoModule: Module {
       "content": content, "timestamp": ts,
       "category": 0, "reply": false, "type": 1,
     ]
-    let payload = try AssistantEncoders.notification(type: 2, body: body)
+    let payload = try DeviceBusinessWire.encode(type: 2, json: body)
     try sendBusiness(.notification, payload: payload)
   }
 
@@ -792,56 +706,31 @@ public class RayNeoModule: Module {
     sendEvent("connectionState", ["state": stateName])
   }
 
-  fileprivate func handleDiscovered(_ peripheral: CBPeripheral) {
+  fileprivate func handleDiscovered(
+    _ peripheral: CBPeripheral,
+    advertisementData: [String: Any],
+    rssi: NSNumber
+  ) {
     let id = peripheral.identifier.uuidString
     let name = peripheral.name ?? "RayNeo iO"
     discoveredPeripherals[peripheral.identifier] = peripheral
-    sendEvent("scanResult", ["id": id, "name": name, "rssi": 0])
-  }
+    sendEvent("scanResult", ["id": id, "name": name, "rssi": rssi.intValue])
 
-  // MARK: - Transport frame (EA fallback only)
-
-  private struct TransportFrame {
-    let messageNumber: UInt16
-    let flags: UInt8
-    let wireBusinessID: UInt8
-    let payload: Data
-
-    func encoded() -> Data {
-      let length = 10 + payload.count - 6
-      var result = Data([
-        0xAA, 0x55,
-        UInt8(truncatingIfNeeded: length >> 8),
-        UInt8(truncatingIfNeeded: length & 0xFF),
-        UInt8(truncatingIfNeeded: messageNumber >> 8),
-        UInt8(truncatingIfNeeded: messageNumber & 0xFF),
-        flags
-      ])
-      result.append(wireBusinessID)
-      result.append(payload)
-      let crc = CRC16XMODEM.checksum(result.dropFirst(4))
-      result.append(UInt8(crc >> 8))
-      result.append(UInt8(crc & 0xFF))
-      return result
-    }
-  }
-
-  // MARK: - CRC-16/XMODEM
-
-  private enum CRC16XMODEM {
-    static func checksum(_ bytes: Data) -> UInt16 {
-      var crc: UInt16 = 0
-      for byte in bytes {
-        crc ^= UInt16(byte) << 8
-        for _ in 0..<8 {
-          if crc & 0x8000 != 0 {
-            crc = (crc << 1) ^ 0x1021
-          } else {
-            crc <<= 1
-          }
-        }
+    // Parse manufacturer advertisement data with the SDK's RNProbeIdentifier
+    if !parsedAdvertisements.contains(peripheral.identifier),
+       let data = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data {
+      parsedAdvertisements.insert(peripheral.identifier)
+      let connectable = (advertisementData[CBAdvertisementDataIsConnectable] as? NSNumber)?.boolValue ?? false
+      // RNProbeIdentifier parses the ad data and returns the SDK device ID
+      if RNProbeIdentifier(data, connectable) != nil,
+         let sdkCBPeripheral = RNProbeSDKPeripheral(peripheral.identifier),
+         let catalog = modelCatalog {
+        // RNProbePeripheral creates the SDK's RNPeripheral NSObject from the ad data
+        // and the SDK's own CBPeripheral (not our scanner's)
+        sdkPeripherals[peripheral.identifier] = RNProbePeripheral(
+          data, sdkCBPeripheral, advertisementData, catalog
+        )
       }
-      return crc
     }
   }
 
@@ -851,5 +740,16 @@ public class RayNeoModule: Module {
     let f = ISO8601DateFormatter()
     f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return f.string(from: Date())
+  }
+
+  private static func teleprompterChecksum(_ bytes: Data) -> String {
+    var hash: UInt32 = 2_166_136_261
+    for byte in bytes {
+      hash ^= UInt32(byte)
+      hash = hash &* 16_777_619
+    }
+    let hex = String(hash, radix: 16, uppercase: false)
+    if hex.count >= 8 { return hex }
+    return String(repeating: "0", count: 8 - hex.count) + hex
   }
 }
