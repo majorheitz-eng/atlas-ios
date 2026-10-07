@@ -101,6 +101,11 @@ export default function AtlasHomeScreen() {
   const autoListenBlockedRef = useRef(false); // set on error or manual stop
   const autoListenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const beginListeningRef = useRef<() => void>(() => {});
+  // Hold-to-activate: onPressIn starts a 3s timer; if it fires before
+  // onPressOut, conversation mode turns ON. A quick tap (< 3s) while the
+  // mode is already on turns it OFF. The header ◑ button still toggles.
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdFiredRef = useRef(false);
   // Pulsing dot indicator (no Animated — toggle opacity via setInterval).
   const [pulseOn, setPulseOn] = useState(true);
 
@@ -417,28 +422,97 @@ export default function AtlasHomeScreen() {
     };
   }, [state.phase]);
 
-  // ── Conversation mode toggle ─────────────────────────────────────────
+  // ── Conversation mode toggle (header ◑ button) ───────────────────────
+  // The header button still toggles on/off for discoverability. The orb
+  // itself uses hold-to-activate / tap-to-end (see reactorPress handlers).
   const toggleConversationMode = useCallback(() => {
     setConversationMode((prev) => {
       const next = !prev;
       conversationModeRef.current = next;
       if (next) {
         autoListenBlockedRef.current = false;
-        // Greet the user when entering conversation mode
+        // Greet the user when entering conversation mode. Dispatch
+        // GREETING_STARTED so phase becomes 'speaking' — when the greeting
+        // finishes, SPEECH_FINISHED transitions phase to 'idle', which
+        // fires the auto-listen effect and re-arms the mic.
+        dispatch({ type: 'GREETING_STARTED' });
         setTimeout(() => {
           void speakReply('Hello Major, how may I assist you?', () => {
             dispatch({ type: 'SPEECH_FINISHED' });
           });
         }, 300);
-      } else if (autoListenTimerRef.current) {
-        clearTimeout(autoListenTimerRef.current);
-        autoListenTimerRef.current = null;
+      } else {
+        if (autoListenTimerRef.current) {
+          clearTimeout(autoListenTimerRef.current);
+          autoListenTimerRef.current = null;
+        }
         Speech.stop();
       }
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       return next;
     });
   }, []);
+
+  // ── Orb press handlers: hold 3s to activate, tap to end ─────────────
+  // onPressIn: start a 3s hold timer. If it fires → activate conversation mode.
+  // onPressOut: cancel the timer. If the timer did NOT fire, this was a tap:
+  //   - If conversation mode is active → turn it OFF.
+  //   - If conversation mode is inactive → fall through to normal onPress
+  //     (beginListening) so a quick tap still starts a single voice prompt.
+  const reactorOnPressIn = useCallback(() => {
+    holdFiredRef.current = false;
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = setTimeout(() => {
+      holdFiredRef.current = true;
+      holdTimerRef.current = null;
+      if (!conversationModeRef.current) {
+        // Activate conversation mode
+        conversationModeRef.current = true;
+        autoListenBlockedRef.current = false;
+        setConversationMode(true);
+        dispatch({ type: 'GREETING_STARTED' });
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setTimeout(() => {
+          void speakReply('Hello Major, how may I assist you?', () => {
+            dispatch({ type: 'SPEECH_FINISHED' });
+          });
+        }, 300);
+      }
+    }, 3000);
+  }, []);
+
+  const reactorOnPressOut = useCallback(() => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (holdFiredRef.current) {
+      holdFiredRef.current = false;
+      return; // The hold already activated the mode — don't also onPress.
+    }
+    // Quick tap (< 3s):
+    if (conversationModeRef.current) {
+      // Turn OFF conversation mode
+      conversationModeRef.current = false;
+      setConversationMode(false);
+      if (autoListenTimerRef.current) {
+        clearTimeout(autoListenTimerRef.current);
+        autoListenTimerRef.current = null;
+      }
+      Speech.stop();
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    // If conversation mode is OFF, the Pressable's onPress (beginListening)
+    // fires next and starts a single listening prompt as before.
+  }, []);
+
+  // The Pressable onPress fires after onPressOut. When conversation mode is
+  // active, a tap already ended it via onPressOut — don't also start listening.
+  // When mode is OFF, fall through to beginListening for a single prompt.
+  const reactorOnPress = useCallback(() => {
+    if (conversationModeRef.current) return; // mode is on; tap ended via onPressOut
+    void beginListening();
+  }, [beginListening]);
 
   // Pulsing dot indicator — setInterval, no Animated API.
   useEffect(() => {
@@ -654,7 +728,13 @@ export default function AtlasHomeScreen() {
         </ScrollView>
 
         <View style={styles.reactorWrap}>
-          <ArcReactor mode={mode} onPress={beginListening} level={micLevel} />
+          <ArcReactor
+            mode={mode}
+            onPress={reactorOnPress}
+            onPressIn={reactorOnPressIn}
+            onPressOut={reactorOnPressOut}
+            level={micLevel}
+          />
         </View>
 
         {pendingAttachment && (

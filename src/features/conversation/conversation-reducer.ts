@@ -23,6 +23,7 @@ export type ConversationAction =
   | { type: 'UTTERANCE_SUBMITTED'; id: string; text: string; createdAt: string }
   | { type: 'RESPONSE_RECEIVED'; replyId: string; requestId: string; text: string; createdAt: string }
   | { type: 'REQUEST_FAILED'; requestId: string; error: string }
+  | { type: 'GREETING_STARTED' }
   | { type: 'SPEECH_FINISHED' }
   | { type: 'ERROR_CLEARED' }
   | { type: 'HISTORY_LOADED'; messages: ConversationMessage[] }
@@ -90,6 +91,8 @@ export function conversationReducer(
           message.id === action.requestId ? { ...message, status: 'failed' as const } : message,
         ),
       };
+    case 'GREETING_STARTED':
+      return { ...state, phase: 'speaking', error: null };
     case 'SPEECH_FINISHED':
       return { ...state, phase: 'idle' };
     case 'ERROR_CLEARED':
