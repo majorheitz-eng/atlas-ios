@@ -286,7 +286,7 @@ public class RayNeoModule: Module {
     if core == nil {
       // coreShared() calls the real RNCoreConnect.shared() via @_silgen_name
       core = coreShared()
-      if let core = core {
+      if core != nil {
         sendEvent("connectionState", ["state": "sdkLoaded", "version": coreVersion() ?? "unknown"])
         if modelCatalog == nil { modelCatalog = sdkModelCatalog() }
         setupMessageReceiver()
