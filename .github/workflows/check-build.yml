@@ -11,6 +11,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: pip3 install pyjwt requests cryptography
+
       - name: Check build status and submit for TestFlight
         env:
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
