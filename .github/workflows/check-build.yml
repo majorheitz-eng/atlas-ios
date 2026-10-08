@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: pip3 install pyjwt requests cryptography
+        run: pip3 install --break-system-packages pyjwt requests cryptography
 
       - name: Check build status and submit for TestFlight
         env:
