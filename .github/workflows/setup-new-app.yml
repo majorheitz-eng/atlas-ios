@@ -1,0 +1,114 @@
+name: Setup New App Beta
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_id:
+        description: 'ASC App ID'
+        required: true
+        default: '6820563445'
+
+jobs:
+  setup:
+    name: Setup Beta Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: pip3 install pyjwt requests cryptography
+
+      - name: Setup beta info, group, tester
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: 4YS72UMN75
+          ASC_ISSUER_ID: 98cc8215-df4b-4071-993d-2f83eb0e502d
+          APP_ID: ${{ github.event.inputs.app_id }}
+        run: |
+          echo "$ASC_KEY_P8" > AuthKey_4YS72UMN75.p8
+          
+          python3 << 'PYEOF'
+          import jwt, time, requests, json
+
+          key_id = "4YS72UMN75"
+          issuer_id = "98cc8215-df4b-4071-993d-2f83eb0e502d"
+          app_id = "6820563445"
+
+          with open("AuthKey_4YS72UMN75.p8", "r") as f:
+              private_key = f.read()
+
+          payload = {"iss": issuer_id, "iat": int(time.time()), "exp": int(time.time()) + 1200, "aud": "appstoreconnect-v1"}
+          token = jwt.encode(payload, private_key, algorithm="ES256", headers={"kid": key_id})
+          headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+          # 1. Set beta app localization
+          print("=== Beta Localization ===")
+          loc_url = "https://api.appstoreconnect.apple.com/v1/betaAppLocalizations"
+          loc_body = {
+              "data": {
+                  "type": "betaAppLocalizations",
+                  "attributes": {
+                      "description": "Atlas Voice Assistant - RayNeo glasses companion app",
+                      "feedbackEmail": "captainmajorh@gmail.com",
+                      "locale": "en-US"
+                  },
+                  "relationships": {
+                      "app": {"data": {"type": "apps", "id": app_id}}
+                  }
+              }
+          }
+          loc_resp = requests.post(loc_url, headers=headers, json=loc_body)
+          print(f"Localization: {loc_resp.status_code}")
+          if loc_resp.status_code == 409:
+              print("Already exists, updating...")
+              get_loc = requests.get(f"https://api.appstoreconnect.apple.com/v1/apps/{app_id}/betaAppLocalizations", headers=headers)
+              loc_data = get_loc.json()
+              if "data" in loc_data and len(loc_data["data"]) > 0:
+                  loc_id = loc_data["data"][0]["id"]
+                  update = requests.patch(f"https://api.appstoreconnect.apple.com/v1/betaAppLocalizations/{loc_id}", headers=headers, json={
+                      "data": {"type": "betaAppLocalizations", "id": loc_id, "attributes": {"description": "Atlas Voice Assistant - RayNeo glasses companion app", "feedbackEmail": "captainmajorh@gmail.com"}}
+                  })
+                  print(f"Update: {update.status_code}")
+
+          # 2. Create beta group
+          print("\n=== Beta Group ===")
+          group_url = "https://api.appstoreconnect.apple.com/v1/betaGroups"
+          group_body = {
+              "data": {
+                  "type": "betaGroups",
+                  "attributes": {"name": "Internal Testers", "isInternalGroup": True},
+                  "relationships": {"app": {"data": {"type": "apps", "id": app_id}}}
+              }
+          }
+          group_resp = requests.post(group_url, headers=headers, json=group_body)
+          print(f"Beta group: {group_resp.status_code}")
+          group_id = None
+          if group_resp.status_code == 201:
+              group_id = group_resp.json()["data"]["id"]
+          elif group_resp.status_code == 409:
+              get_groups = requests.get(f"https://api.appstoreconnect.apple.com/v1/apps/{app_id}/betaGroups", headers=headers)
+              groups_data = get_groups.json()
+              if "data" in groups_data and len(groups_data["data"]) > 0:
+                  group_id = groups_data["data"][0]["id"]
+                  print(f"Using existing group: {group_id}")
+
+          # 3. Add tester
+          print("\n=== Beta Tester ===")
+          tester_url = "https://api.appstoreconnect.apple.com/v1/betaTesters"
+          tester_body = {
+              "data": {
+                  "type": "betaTesters",
+                  "attributes": {"email": "captainmajorh@gmail.com", "firstName": "Major", "lastName": "Heitz"},
+                  "relationships": {
+                      "apps": {"data": [{"type": "apps", "id": app_id}]},
+                  }
+              }
+          }
+          if group_id:
+              tester_body["data"]["relationships"]["betaGroups"] = {"data": [{"type": "betaGroups", "id": group_id}]}
+          tester_resp = requests.post(tester_url, headers=headers, json=tester_body)
+          print(f"Tester: {tester_resp.status_code}")
+          if tester_resp.status_code == 409:
+              print("Tester already exists for this app")
+          
+          print(f"\nDone! App ID: {app_id}, Group ID: {group_id}")
+
+          PYEOF
