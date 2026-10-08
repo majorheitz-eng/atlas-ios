@@ -80,13 +80,27 @@ jobs:
           builds_data = builds_resp.json()
 
           valid_build = None
-          for build in builds_data.get("data", []):
+          # Sort builds by uploadedDate descending to get the latest first
+          builds_list = builds_data.get("data", [])
+          # Find build 3 (our Turbo-IO build) specifically
+          for build in builds_list:
               v = build["attributes"].get("version", "?")
               s = build["attributes"].get("processingState", "?")
               e = build["attributes"].get("expired", False)
-              print(f"Build {v}: state={s}, expired={e}")
-              if s == "VALID" and not e:
+              uploaded = build["attributes"].get("uploadedDate", "")
+              print(f"Build {v}: state={s}, expired={e}, uploaded={uploaded}")
+              if v == "3" and s == "VALID" and not e:
                   valid_build = build
+                  break
+          # Fallback to latest valid if build 3 not found
+          if not valid_build:
+              for build in builds_list:
+                  v = build["attributes"].get("version", "?")
+                  s = build["attributes"].get("processingState", "?")
+                  e = build["attributes"].get("expired", False)
+                  if s == "VALID" and not e:
+                      valid_build = build
+                      break
 
           if not valid_build:
               print("No valid build found")
