@@ -6,12 +6,12 @@ on:
 jobs:
   submit:
     name: Submit Build for TestFlight
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     steps:
       - name: Install dependencies
-        run: pip3 install --break-system-packages pyjwt requests cryptography
+        run: pip3 install pyjwt requests cryptography
 
-      - name: Check builds and submit for beta testing
+      - name: Set beta info and submit build
         env:
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           ASC_KEY_ID: 4YS72UMN75
@@ -21,10 +21,7 @@ jobs:
           echo "$ASC_KEY_P8" > AuthKey_4YS72UMN75.p8
           
           python3 << 'PYEOF'
-          import jwt
-          import time
-          import requests
-          import json
+          import jwt, time, requests, json
 
           key_id = "4YS72UMN75"
           issuer_id = "98cc8215-df4b-4071-993d-2f83eb0e502d"
@@ -33,73 +30,85 @@ jobs:
           with open("AuthKey_4YS72UMN75.p8", "r") as f:
               private_key = f.read()
 
-          payload = {
-              "iss": issuer_id,
-              "iat": int(time.time()),
-              "exp": int(time.time()) + 1200,
-              "aud": "appstoreconnect-v1"
-          }
-
+          payload = {"iss": issuer_id, "iat": int(time.time()), "exp": int(time.time()) + 1200, "aud": "appstoreconnect-v1"}
           token = jwt.encode(payload, private_key, algorithm="ES256", headers={"kid": key_id})
-          
-          headers = {
-              "Authorization": f"Bearer {token}",
-              "Content-Type": "application/json"
-          }
+          headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
-          # Get all builds for the app
-          url = f"https://api.appstoreconnect.apple.com/v1/apps/{app_id}/builds"
-          resp = requests.get(url, headers=headers)
-          print(f"GET builds status: {resp.status_code}")
-          data = resp.json()
+          # 1. Set beta app localization (required for TestFlight)
+          print("=== Setting beta app localization ===")
+          loc_url = f"https://api.appstoreconnect.apple.com/v1/apps/{app_id}/betaAppLocalizations"
+          loc_resp = requests.get(loc_url, headers=headers)
+          loc_data = loc_resp.json()
           
-          if "data" not in data:
-              print("No builds found or auth error")
-              print(json.dumps(data, indent=2))
-              exit(1)
+          if "data" in loc_data and len(loc_data["data"]) > 0:
+              loc_id = loc_data["data"][0]["id"]
+              print(f"Updating localization {loc_id}...")
+              update_url = f"https://api.appstoreconnect.apple.com/v1/betaAppLocalizations/{loc_id}"
+              update_body = {"data": {"type": "betaAppLocalizations", "id": loc_id, "attributes": {"description": "Atlas Voice Assistant - RayNeo glasses companion app", "feedbackEmail": "captainmajorh@gmail.com"}}}
+              update_resp = requests.patch(update_url, headers=headers, json=update_body)
+              print(f"Update: {update_resp.status_code}")
+          else:
+              print("Creating localization...")
+              create_url = "https://api.appstoreconnect.apple.com/v1/betaAppLocalizations"
+              create_body = {"data": {"type": "betaAppLocalizations", "attributes": {"description": "Atlas Voice Assistant - RayNeo glasses companion app", "feedbackEmail": "captainmajorh@gmail.com", "locale": "en-US"}, "relationships": {"app": {"data": {"type": "apps", "id": app_id}}}}}
+              create_resp = requests.post(create_url, headers=headers, json=create_body)
+              print(f"Create: {create_resp.status_code}")
+
+          # 2. Create/check beta group
+          print("\n=== Beta groups ===")
+          groups_url = f"https://api.appstoreconnect.apple.com/v1/apps/{app_id}/betaGroups"
+          groups_resp = requests.get(groups_url, headers=headers)
+          groups_data = groups_resp.json()
           
+          group_id = None
+          if "data" in groups_data and len(groups_data["data"]) > 0:
+              group_id = groups_data["data"][0]["id"]
+              print(f"Found group: {group_id}")
+          else:
+              print("Creating internal group...")
+              create_group_url = "https://api.appstoreconnect.apple.com/v1/betaGroups"
+              create_group_body = {"data": {"type": "betaGroups", "attributes": {"name": "Internal Testers", "isInternalGroup": True}, "relationships": {"app": {"data": {"type": "apps", "id": app_id}}}}}
+              group_resp = requests.post(create_group_url, headers=headers, json=create_group_body)
+              if "data" in group_resp.json():
+                  group_id = group_resp.json()["data"]["id"]
+                  print(f"Created group: {group_id}")
+
+          # 3. Get builds
+          print("\n=== Builds ===")
+          builds_url = f"https://api.appstoreconnect.apple.com/v1/apps/{app_id}/builds"
+          builds_resp = requests.get(builds_url, headers=headers)
+          builds_data = builds_resp.json()
+
           valid_build = None
-          for build in data["data"]:
-              version = build["attributes"].get("version", "unknown")
-              processing_state = build["attributes"].get("processingState", "unknown")
-              expired = build["attributes"].get("expired", False)
-              build_id = build["id"]
-              print(f"Build {version}: state={processing_state}, expired={expired}, id={build_id}")
-              
-              if processing_state == "VALID" and not expired:
+          for build in builds_data.get("data", []):
+              v = build["attributes"].get("version", "?")
+              s = build["attributes"].get("processingState", "?")
+              e = build["attributes"].get("expired", False)
+              print(f"Build {v}: state={s}, expired={e}")
+              if s == "VALID" and not e:
                   valid_build = build
-                  break
 
           if not valid_build:
-              print("No VALID non-expired build found. Builds may still be processing.")
+              print("No valid build found")
               exit(0)
 
           build_id = valid_build["id"]
-          build_version = valid_build["attributes"]["version"]
-          print(f"\nSubmitting build {build_version} (id={build_id}) for beta review...")
+          build_ver = valid_build["attributes"]["version"]
 
-          # Create betaAppReviewSubmission
+          # 4. Add build to group
+          if group_id:
+              print(f"\nAdding build {build_ver} to group...")
+              add_url = f"https://api.appstoreconnect.apple.com/v1/betaGroups/{group_id}/relationships/builds"
+              add_body = {"data": [{"type": "builds", "id": build_id}]}
+              add_resp = requests.post(add_url, headers=headers, json=add_body)
+              print(f"Add to group: {add_resp.status_code}")
+
+          # 5. Submit for beta review
+          print(f"\nSubmitting build {build_ver} for beta review...")
           review_url = "https://api.appstoreconnect.apple.com/v1/betaAppReviewSubmissions"
-          review_body = {
-              "data": {
-                  "type": "betaAppReviewSubmissions",
-                  "relationships": {
-                      "build": {
-                          "data": {
-                              "type": "builds",
-                              "id": build_id
-                          }
-                      }
-                  }
-              }
-          }
+          review_body = {"data": {"type": "betaAppReviewSubmissions", "relationships": {"build": {"data": {"type": "builds", "id": build_id}}}}}
           review_resp = requests.post(review_url, headers=headers, json=review_body)
-          print(f"Beta review submission status: {review_resp.status_code}")
-          print(json.dumps(review_resp.json(), indent=2))
-
-          if review_resp.status_code in (201, 200, 409):
-              print("\nBuild submitted for TestFlight beta review!")
-          else:
-              print(f"\nSubmission may have failed. Check response above.")
+          print(f"Review submission: {review_resp.status_code}")
+          print(json.dumps(review_resp.json(), indent=2)[:500])
 
           PYEOF
