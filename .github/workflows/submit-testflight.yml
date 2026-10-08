@@ -25,7 +25,7 @@ jobs:
 
           key_id = "4YS72UMN75"
           issuer_id = "98cc8215-df4b-4071-993d-2f83eb0e502d"
-          app_id = "6818316186"
+          app_id = "6820563445"  # Atlas RayNeo
 
           with open("AuthKey_4YS72UMN75.p8", "r") as f:
               private_key = f.read()
@@ -89,7 +89,7 @@ jobs:
               e = build["attributes"].get("expired", False)
               uploaded = build["attributes"].get("uploadedDate", "")
               print(f"Build {v}: state={s}, expired={e}, uploaded={uploaded}")
-              if v == "3" and s == "VALID" and not e:
+              if v == "1" and s == "VALID" and not e:
                   valid_build = build
                   break
           # Fallback to latest valid if build 3 not found
