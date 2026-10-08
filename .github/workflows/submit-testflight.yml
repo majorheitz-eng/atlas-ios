@@ -89,7 +89,7 @@ jobs:
               e = build["attributes"].get("expired", False)
               uploaded = build["attributes"].get("uploadedDate", "")
               print(f"Build {v}: state={s}, expired={e}, uploaded={uploaded}")
-              if v == "1" and s == "VALID" and not e:
+              if v == "2" and s == "VALID" and not e:
                   valid_build = build
                   break
           # Fallback to latest valid if build 3 not found
