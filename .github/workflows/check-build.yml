@@ -1,0 +1,90 @@
+name: Check Build Status & Submit TestFlight
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Check Build & Submit
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check build status and submit for TestFlight
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: 4YS72UMN75
+          ASC_ISSUER_ID: U7UKMADP3R
+          APP_ID: 6818316186
+        run: |
+          # Write the key to a file
+          echo "$ASC_KEY_P8" > AuthKey_4YS72UMN75.p8
+          
+          # Create JWT using Python
+          python3 << 'PYEOF'
+          import jwt
+          import time
+          import requests
+          import json
+
+          key_id = "4YS72UMN75"
+          issuer_id = "U7UKMADP3R"
+          app_id = "6818316186"
+
+          with open("AuthKey_4YS72UMN75.p8", "r") as f:
+              private_key = f.read()
+
+          payload = {
+              "iss": issuer_id,
+              "iat": int(time.time()),
+              "exp": int(time.time()) + 900,
+              "aud": "appstoreconnect-v1"
+          }
+
+          token = jwt.encode(payload, private_key, algorithm="ES256", headers={"kid": key_id})
+          
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Content-Type": "application/json"
+          }
+
+          # Get all builds for the app
+          url = f"https://api.appstoreconnect.apple.com/v1/apps/{app_id}/builds"
+          resp = requests.get(url, headers=headers)
+          print(f"Status: {resp.status_code}")
+          data = resp.json()
+          print(json.dumps(data, indent=2))
+          
+          # Check if any build is in PROCESSING or VALID state
+          if "data" in data:
+              for build in data["data"]:
+                  version = build["attributes"].get("version", "unknown")
+                  processing_state = build["attributes"].get("processingState", "unknown")
+                  expired = build["attributes"].get("expired", False)
+                  print(f"\nBuild {version}: state={processing_state}, expired={expired}")
+                  
+                  # If build is VALID and not expired, try to add it to a beta group
+                  if processing_state == "VALID" and not expired:
+                      build_id = build["id"]
+                      print(f"Build {version} is VALID! Attempting to submit for beta review...")
+                      
+                      # Create a betaAppReviewSubmission
+                      review_url = "https://api.appstoreconnect.apple.com/v1/betaAppReviewSubmissions"
+                      review_body = {
+                          "data": {
+                              "type": "betaAppReviewSubmissions",
+                              "relationships": {
+                                  "build": {
+                                      "data": {
+                                          "type": "builds",
+                                          "id": build_id
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                      review_resp = requests.post(review_url, headers=headers, json=review_body)
+                      print(f"Review submission status: {review_resp.status_code}")
+                      print(json.dumps(review_resp.json(), indent=2))
+          PYEOF
