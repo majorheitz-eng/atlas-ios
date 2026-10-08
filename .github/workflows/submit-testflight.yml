@@ -117,7 +117,38 @@ jobs:
               add_resp = requests.post(add_url, headers=headers, json=add_body)
               print(f"Add to group: {add_resp.status_code}")
 
-          # 5. Submit for beta review
+          # 5. Set export compliance
+          print("\n=== Setting export compliance ===")
+          ec_url = f"https://api.appstoreconnect.apple.com/v1/apps/{app_id}"
+          ec_body = {
+              "data": {
+                  "type": "apps",
+                  "id": app_id,
+                  "attributes": {
+                      "usesIdfa": False
+                  }
+              }
+          }
+          ec_resp = requests.patch(ec_url, headers=headers, json=ec_body)
+          print(f"Export compliance (IDFA): {ec_resp.status_code}")
+
+          # Also set the build's export compliance
+          ec_build_url = f"https://api.appstoreconnect.apple.com/v1/builds/{build_id}"
+          ec_build_body = {
+              "data": {
+                  "type": "builds",
+                  "id": build_id,
+                  "attributes": {
+                      "usesNonExemptEncryption": False
+                  }
+              }
+          }
+          ec_build_resp = requests.patch(ec_build_url, headers=headers, json=ec_build_body)
+          print(f"Build export compliance: {ec_build_resp.status_code}")
+          if ec_build_resp.status_code != 200:
+              print(json.dumps(ec_build_resp.json(), indent=2)[:500])
+
+          # 6. Submit for beta review
           print(f"\nSubmitting build {build_ver} for beta review...")
           review_url = "https://api.appstoreconnect.apple.com/v1/betaAppReviewSubmissions"
           review_body = {"data": {"type": "betaAppReviewSubmissions", "relationships": {"build": {"data": {"type": "builds", "id": build_id}}}}}
