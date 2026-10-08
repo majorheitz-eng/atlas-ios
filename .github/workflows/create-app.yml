@@ -1,0 +1,139 @@
+name: Create New ASC App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create:
+    name: Create New App in ASC
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: pip3 install pyjwt requests cryptography
+
+      - name: Create app
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: 4YS72UMN75
+          ASC_ISSUER_ID: 98cc8215-df4b-4071-993d-2f83eb0e502d
+        run: |
+          echo "$ASC_KEY_P8" > AuthKey_4YS72UMN75.p8
+          
+          python3 << 'PYEOF'
+          import jwt, time, requests, json
+
+          key_id = "4YS72UMN75"
+          issuer_id = "98cc8215-df4b-4071-993d-2f83eb0e502d"
+
+          with open("AuthKey_4YS72UMN75.p8", "r") as f:
+              private_key = f.read()
+
+          payload = {"iss": issuer_id, "iat": int(time.time()), "exp": int(time.time()) + 1200, "aud": "appstoreconnect-v1"}
+          token = jwt.encode(payload, private_key, algorithm="ES256", headers={"kid": key_id})
+          headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+          # First, check existing bundle IDs to see what's available
+          print("=== Checking bundle IDs ===")
+          bundle_url = "https://api.appstoreconnect.apple.com/v1/bundleIdCapabilities"
+          
+          # List existing apps
+          apps_url = "https://api.appstoreconnect.apple.com/v1/apps"
+          apps_resp = requests.get(apps_url, headers=headers)
+          print(f"Apps status: {apps_resp.status_code}")
+          apps_data = apps_resp.json()
+          for app in apps_data.get("data", []):
+              print(f"  App: {app['attributes'].get('name', '?')} | BundleID: {app['attributes'].get('bundleId', '?')} | ID: {app['id']}")
+
+          # Try to create a new app with bundle ID com.kendrickhome.atlas
+          # Since the old app already uses this bundle ID, we need a different one
+          # Let's try com.kendrickhome.rayneo
+          print("\n=== Creating new app ===")
+          create_url = "https://api.appstoreconnect.apple.com/v1/apps"
+          create_body = {
+              "data": {
+                  "type": "apps",
+                  "attributes": {
+                      "name": "Atlas",
+                      "bundleId": "com.kendrickhome.rayneo",
+                      "primaryLocale": "en-US",
+                      "platform": "IOS"
+                  }
+              }
+          }
+          create_resp = requests.post(create_url, headers=headers, json=create_body)
+          print(f"Create status: {create_resp.status_code}")
+          create_data = create_resp.json()
+          print(json.dumps(create_data, indent=2)[:1000])
+          
+          if create_resp.status_code == 201:
+              app_id = create_data["data"]["id"]
+              print(f"\n✅ Created new app! ID: {app_id}")
+              
+              # Set beta app localization
+              print("\nSetting beta localization...")
+              loc_url = "https://api.appstoreconnect.apple.com/v1/betaAppLocalizations"
+              loc_body = {
+                  "data": {
+                      "type": "betaAppLocalizations",
+                      "attributes": {
+                          "description": "Atlas Voice Assistant - RayNeo glasses companion app",
+                          "feedbackEmail": "captainmajorh@gmail.com",
+                          "locale": "en-US"
+                      },
+                      "relationships": {
+                          "app": {
+                              "data": {"type": "apps", "id": app_id}
+                          }
+                      }
+                  }
+              }
+              loc_resp = requests.post(loc_url, headers=headers, json=loc_body)
+              print(f"Localization: {loc_resp.status_code}")
+              
+              # Create beta group
+              print("Creating beta group...")
+              group_url = "https://api.appstoreconnect.apple.com/v1/betaGroups"
+              group_body = {
+                  "data": {
+                      "type": "betaGroups",
+                      "attributes": {
+                          "name": "Internal Testers",
+                          "isInternalGroup": True
+                      },
+                      "relationships": {
+                          "app": {
+                              "data": {"type": "apps", "id": app_id}
+                          }
+                      }
+                  }
+              }
+              group_resp = requests.post(group_url, headers=headers, json=group_body)
+              print(f"Beta group: {group_resp.status_code}")
+              
+              # Add tester
+              if group_resp.status_code == 201:
+                  group_id = group_resp.json()["data"]["id"]
+                  print("Adding tester...")
+                  tester_url = "https://api.appstoreconnect.apple.com/v1/betaTesters"
+                  tester_body = {
+                      "data": {
+                          "type": "betaTesters",
+                          "attributes": {
+                              "email": "captainmajorh@gmail.com",
+                              "firstName": "Major",
+                              "lastName": "Heitz"
+                          },
+                          "relationships": {
+                              "apps": {
+                                  "data": [{"type": "apps", "id": app_id}]
+                              },
+                              "betaGroups": {
+                                  "data": [{"type": "betaGroups", "id": group_id}]
+                              }
+                          }
+                      }
+                  }
+                  tester_resp = requests.post(tester_url, headers=headers, json=tester_body)
+                  print(f"Tester: {tester_resp.status_code}")
+          
+          PYEOF
