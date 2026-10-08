@@ -1,0 +1,39 @@
+name: Upload Local IPA to TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag with IPA asset'
+        required: true
+        default: 'build-18'
+
+jobs:
+  upload:
+    name: Upload IPA to App Store Connect
+    runs-on: macos-14
+    steps:
+      - name: Download IPA from release
+        uses: dsaltares/fetch-gh-release-asset@1.1.2
+        with:
+          release: ${{ github.event.inputs.tag }}
+          filename: AtlasAI.ipa
+          target: AtlasAI.ipa
+
+      - name: Setup App Store Connect API Key
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.ASC_KEY_P8 }}" > ~/.appstoreconnect/private_keys/AuthKey_4YS72UMN75.p8
+
+      - name: Upload to TestFlight
+        run: |
+          xcrun altool --upload-app \
+            -f AtlasAI.ipa \
+            -t ios \
+            --apiKey 4YS72UMN75 \
+            --apiIssuer 98cc8215-df4b-4071-993d-2f83eb0e502d
+
+      - name: Result
+        run: |
+          echo "Upload complete. Check App Store Connect for processing status."
+          echo "https://appstoreconnect.apple.com/apps/6818316186/testflight/ios"
