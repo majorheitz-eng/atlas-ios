@@ -12,13 +12,18 @@ jobs:
   upload:
     name: Upload IPA to App Store Connect
     runs-on: macos-14
+    permissions:
+      contents: read
     steps:
       - name: Download IPA from release
-        uses: dsaltares/fetch-gh-release-asset@1.1.2
-        with:
-          release: ${{ github.event.inputs.tag }}
-          filename: AtlasAI.ipa
-          target: AtlasAI.ipa
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -sL -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.tag }}/AtlasAI.ipa" \
+            -o AtlasAI.ipa
+          ls -lh AtlasAI.ipa
 
       - name: Setup App Store Connect API Key
         run: |
