@@ -19,11 +19,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -sL -H "Authorization: token $GH_TOKEN" \
+          # Use GitHub API to get the asset download URL, then curl with auth
+          ASSET_URL=$(curl -s \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.event.inputs.tag }}" \
+            | python3 -c "import sys,json; data=json.load(sys.stdin); assets=[a for a in data.get('assets',[]) if a['name']=='AtlasAI.ipa']; print(assets[0]['url'] if assets else '')")
+          if [ -z "$ASSET_URL" ]; then echo "No AtlasAI.ipa asset found in release ${{ github.event.inputs.tag }}"; exit 1; fi
+          echo "Downloading from: $ASSET_URL"
+          curl -sL -o AtlasAI.ipa \
+            -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/octet-stream" \
-            "https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.tag }}/AtlasAI.ipa" \
-            -o AtlasAI.ipa
+            "$ASSET_URL"
           ls -lh AtlasAI.ipa
+          # Verify it's a valid zip (IPA is a zip)
+          file AtlasAI.ipa
+          unzip -t AtlasAI.ipa > /dev/null 2>&1 && echo "ZIP OK" || { echo "ZIP CORRUPT"; exit 1; }
 
       - name: Setup App Store Connect API Key
         run: |
